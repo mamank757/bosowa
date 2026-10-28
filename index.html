@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Curah Hujan Bone, Soppeng, Sidrap, dan Wajo</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--c1:#1f77a6;--c2:#d9822b;--c3:#2f9e6b;--c4:#8a5fc7}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1713;--card:#17231d;--ink:#e6efe9;--mut:#9fb0a5;--line:#2a3a31;--bar:#4aa8d8;--c1:#4aa8d8;--c2:#f0a24f;--c3:#4cc790;--c4:#b99af0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{margin:0 0 2px;font-size:clamp(1.4rem,4.5vw,2rem);line-height:1.2}
+.sub{margin:0 0 18px;color:var(--mut);font-size:.9rem}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.bar label{font-weight:600}
+select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px}
+select{font-weight:700;min-width:110px}
+button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.card,.box{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.card{padding:14px 16px;min-width:0;overflow-wrap:anywhere}
+.card .k{font-size:.78rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.card .k i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.card .v{font-size:1.7rem;font-weight:800;line-height:1.2}
+.card .v small{font-size:.85rem;font-weight:600;color:var(--mut)}
+.card .s{font-size:.8rem;color:var(--mut)}
+.box{padding:14px 16px;margin-bottom:16px}
+.box h2{margin:0 0 8px;font-size:1.05rem}
+svg{display:block;width:100%;height:auto}
+.leg{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-weight:600;border-radius:999px;padding:6px 14px;min-height:40px}
+.chip i{display:inline-block;width:11px;height:11px;border-radius:50%}
+.chip[aria-pressed=false]{opacity:.45}
+.lh{font-size:.8rem;color:var(--mut);margin-left:6px}
+.lh i{display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid var(--mut);background:var(--card);vertical-align:-1px;margin-right:5px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px;font-size:.9rem}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+td .ps{display:block;font-size:.72rem;color:var(--mut)}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:0}
+.na{color:var(--mut)}
+.note{font-size:.8rem;color:var(--mut);margin:8px 0 0}
+#st{padding:28px 0;text-align:center;color:var(--mut)}
+@media(max-width:620px){
+.wrap{padding:16px 10px 32px}
+.cards{grid-template-columns:repeat(2,1fr);gap:8px}
+.card{padding:12px}
+.card .k{font-size:.68rem}
+.card .v{font-size:1.35rem}
+.card .s{font-size:.72rem;line-height:1.35}
+.box{padding:12px 8px}
+.box h2,.box .leg,.box .note{padding:0 4px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Curah Hujan Bone, Soppeng, Sidrap, dan Wajo</h1>
+  <p class="sub" id="upd">Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos yang melapor per kabupaten</p>
+
+  <div id="st" role="status">Memuat data…</div>
+
+  <div id="app" hidden>
+    <div class="bar">
+      <label for="thn">Tahun</label>
+      <button id="prev" type="button" aria-label="Tahun sebelumnya">‹</button>
+      <select id="thn"></select>
+      <button id="next" type="button" aria-label="Tahun berikutnya">›</button>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <section class="box">
+      <h2 id="jc">Total curah hujan per bulan</h2>
+      <div class="leg" id="leg"></div>
+      <div id="chart" role="img" aria-label="Grafik garis curah hujan bulanan empat kabupaten"></div>
+    </section>
+
+    <section class="box">
+      <h2 id="jt">Rincian per bulan (mm dan jumlah pos)</h2>
+      <div class="tw"><table>
+        <thead><tr id="th"></tr></thead>
+        <tbody id="tb"></tbody><tfoot id="tf"></tfoot>
+      </table></div>
+      <p class="note">Angka kecil di bawah total adalah rata-rata jumlah pos yang melapor pada bulan itu. Tanda * berarti data bulan belum lengkap, sehingga totalnya lebih kecil dari bulan penuh. Jumlah pos berubah antar tahun (misalnya Bone dari sekitar 5 pos di 2020 menjadi 16 pos di 2026), jadi rata-rata antar tahun belum sepenuhnya sebanding. Pada kabupaten dengan pos sedikit, satu pos yang tidak melapor bisa menggeser rata-rata. Nilai 0 mm bisa berarti data kosong; cek jumlah pos.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+// URL web app Apps Script (berakhiran /exec). Butuh aksi ch_bulanan dari Kabupaten.gs
+const API_URL = 'https://script.google.com/macros/s/AKfycbwd7ZgHlKgNuyrzEC2s727Cls7gA3H0OLJ07dDJrHmOYVL_j0pkX08hJYtE74WvFto8/exec';
+
+const KAB = [
+  { id: 'bone', nm: 'Bone', c: 'var(--c1)' }, { id: 'soppeng', nm: 'Soppeng', c: 'var(--c2)' },
+  { id: 'sidrap', nm: 'Sidrap', c: 'var(--c3)' }, { id: 'wajo', nm: 'Wajo', c: 'var(--c4)' }
+];
+const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const $ = id => document.getElementById(id);
+const fmt = (n, d = 1) => n == null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+let D = {}, tahun = null, aktif = { bone: true, soppeng: true, sidrap: true, wajo: true };
+
+function proses(data) {
+  D = {};
+  KAB.forEach(k => {
+    D[k.id] = {};
+    (data[k.id] || []).forEach(r => {
+      const y = +r.bulan.slice(0, 4), m = +r.bulan.slice(5, 7) - 1;
+      (D[k.id][y] = D[k.id][y] || Array(12).fill(null))[m] = r;
+    });
+  });
+}
+const baris = (id, y) => D[id][y] || Array(12).fill(null);
+const daftarTahun = () => Array.from(new Set(KAB.flatMap(k => Object.keys(D[k.id]).map(Number)))).sort((a, b) => b - a);
+
+function ukur(id) {
+  const W = Math.max(300, Math.round($(id).clientWidth || 720));
+  return { W: W, kecil: W < 520, fb: W < 360 ? 12 : W < 520 ? 13 : 14, fa: W < 520 ? 11 : 12 };   // fb = font bulan, fa = font angka
+}
+
+function langkah(max) {
+  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+
+function kartu() {
+  $('cards').innerHTML = KAB.map(k => {
+    const rows = baris(k.id, tahun).filter(Boolean);
+    const tot = rows.reduce((s, r) => s + r.mm, 0), lk = rows.filter(r => r.lengkap).length;
+    const pos = rows.length ? rows.reduce((s, r) => s + (r.pos_rata || 0), 0) / rows.length : null;
+    return '<div class="card"><div class="k"><i style="background:' + k.c + '"></i>' + k.nm + ' ' + tahun + '</div>' +
+      '<div class="v" style="color:' + k.c + '">' + (rows.length ? fmt(tot, 0) : '–') + ' <small>mm</small></div>' +
+      '<div class="s">' + (rows.length ? lk + ' bulan lengkap dari ' + rows.length + ' · rata-rata ' + fmt(pos, 0) + ' pos' : 'tidak ada data') + '</div></div>';
+  }).join('');
+}
+
+function chips() {
+  $('leg').innerHTML = KAB.map(k => '<button type="button" class="chip" data-k="' + k.id + '" aria-pressed="' + aktif[k.id] + '"><i style="background:' + k.c + '"></i>' + k.nm + '</button>').join('') +
+    '<span class="lh"><i></i>Bulan belum lengkap</span>';
+}
+
+function gambar() {
+  const u = ukur('chart'), W = u.W, H = u.kecil ? 300 : 340, fb = u.fb, fa = u.fa;
+  const m = { l: u.kecil ? 38 : 48, r: 12, t: 16, b: 38 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12;
+  const act = KAB.filter(k => aktif[k.id]);
+  let maks = 10;
+  act.forEach(k => baris(k.id, tahun).forEach(r => { if (r && r.mm > maks) maks = r.mm; }));
+  const st = langkah(maks * 1.05), top = Math.ceil(maks * 1.05 / st) * st;
+  const Y = v => m.t + ph - v / top * ph, X = i => m.l + cw * (i + .5);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
+  for (let v = 0; v <= top + 1e-9; v += st)
+    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--line)"/>' +
+         '<text x="' + (m.l - 5) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="' + fa + '" fill="var(--mut)">' + fmt(v, 0) + '</text>';
+  BLN.forEach((b, i) => { s += '<text x="' + X(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fb + '" font-weight="600" fill="var(--ink)">' + b.slice(0, 3) + '</text>'; });
+  act.forEach(k => {
+    const rows = baris(k.id, tahun);
+    let d = '';
+    rows.forEach((r, i) => { d += r ? (d && rows[i - 1] ? 'L' : 'M') + X(i) + ',' + Y(r.mm) : ''; });
+    s += '<path d="' + d + '" fill="none" stroke="' + k.c + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+    rows.forEach((r, i) => {
+      if (!r) return;
+      s += '<circle cx="' + X(i) + '" cy="' + Y(r.mm) + '" r="' + (u.kecil ? 4 : 4.5) + '" fill="' + (r.lengkap ? k.c : 'var(--card)') + '" stroke="' + k.c + '" stroke-width="2">' +
+           '<title>' + k.nm + ', ' + BLN[i] + ': ' + fmt(r.mm) + ' mm · ' + fmt(r.pos_rata, 0) + ' pos' + (r.lengkap ? '' : ' · data ' + r.hari + '/' + r.hari_bulan + ' hari') + '</title></circle>';
+    });
+  });
+  $('chart').innerHTML = s + '</svg>';
+}
+
+function tabel() {
+  $('th').innerHTML = '<th>Bulan</th>' + KAB.map(k => '<th style="color:' + k.c + '">' + k.nm + ' (mm)</th>').join('');
+  const sum = {}, n = {};
+  KAB.forEach(k => { sum[k.id] = 0; n[k.id] = 0; });
+  $('tb').innerHTML = BLN.map((b, i) => '<tr><td>' + b + '</td>' + KAB.map(k => {
+    const r = baris(k.id, tahun)[i];
+    if (!r) return '<td class="na">–</td>';
+    sum[k.id] += r.mm; n[k.id]++;
+    return '<td><b>' + fmt(r.mm) + (r.lengkap ? '' : '*') + '</b><span class="ps">' + fmt(r.pos_rata, 0) + ' pos</span></td>';
+  }).join('') + '</tr>').join('');
+  $('tf').innerHTML = '<tr><td>Total ' + tahun + '</td>' + KAB.map(k => '<td>' + (n[k.id] ? fmt(sum[k.id]) : '–') + '</td>').join('') + '</tr>';
+}
+
+function render() {
+  $('jc').textContent = 'Total curah hujan per bulan, ' + tahun;
+  $('jt').textContent = 'Rincian per bulan, ' + tahun + ' (mm dan jumlah pos)';
+  kartu(); chips(); gambar(); tabel();
+  const ys = daftarTahun().reverse();
+  $('prev').disabled = tahun <= ys[0]; $('next').disabled = tahun >= ys[ys.length - 1];
+  $('thn').value = tahun;
+  try { history.replaceState(null, '', '#' + tahun); } catch (e) { /* abaikan */ }
+}
+
+function pilih(y) { if (daftarTahun().indexOf(y) > -1) { tahun = y; render(); } }
+
+async function muat() {
+  $('st').hidden = false; $('st').textContent = 'Memuat data…';
+  try {
+    if (API_URL.indexOf('GANTI_') === 0) throw new Error('API_URL belum diisi');
+    const res = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=ch_bulanan&kab=semua');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    if (j.error) throw new Error(j.error);
+    if (!j.data) throw new Error('data kosong');
+    proses(j.data);
+    const ys = daftarTahun();
+    if (!ys.length) throw new Error('data kosong');
+    $('thn').innerHTML = ys.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+    const h = parseInt(location.hash.slice(1), 10);
+    tahun = ys.indexOf(h) > -1 ? h : ys[0];
+    $('upd').textContent = 'Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos yang melapor per kabupaten · diperbarui ' +
+      new Date(j.diperbarui).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    $('st').hidden = true; $('app').hidden = false;
+    render();
+  } catch (e) {
+    $('st').innerHTML = 'Data belum bisa dimuat (' + e.message + '). <button type="button" id="ulang">Coba lagi</button>';
+    $('ulang').onclick = muat;
+  }
+}
+
+$('thn').onchange = e => pilih(+e.target.value);
+$('prev').onclick = () => pilih(tahun - 1);
+$('next').onclick = () => pilih(tahun + 1);
+$('leg').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const id = b.dataset.k, sisa = KAB.filter(k => aktif[k.id] && k.id !== id).length;
+  if (aktif[id] && !sisa) return;               // minimal satu kabupaten tetap tampil
+  aktif[id] = !aktif[id]; chips(); gambar();
+});
+let lw = 0, rz;
+addEventListener('resize', () => {
+  clearTimeout(rz);
+  rz = setTimeout(() => { const w = $('chart').clientWidth; if (w && w !== lw && tahun) { lw = w; gambar(); } }, 150);
+});
+muat();
+</script>
+</body>
+</html>
