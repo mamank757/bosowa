@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riwayat dan Proyeksi Curah Hujan Kabupaten</title>
 
-<!-- External Libraries for Map and PDF -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<!-- Leaflet & html2pdf dimuat malas (lazy) saat dibutuhkan, lihat muatLeaflet() / muatSkrip() -->
 
 <style>
 :root{--bg:#f3f6f4;--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0;--kritis:#e74c3c;--menengah:#f1c40f;--aman:#2ecc71;}
@@ -415,8 +414,11 @@ function blokPDF() {
   return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap</p></div>` +
     `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`;
 }
-function unduhPDF() {
-  if (typeof html2pdf === 'undefined') { alert('Pustaka PDF belum termuat, coba lagi sebentar.'); return; }
+async function unduhPDF() {
+  if (typeof html2pdf === 'undefined') {
+    try { await muatSkrip('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'); }
+    catch (e) { alert('Pustaka PDF gagal dimuat, periksa koneksi lalu coba lagi.'); return; }
+  }
   const d = dataset(), tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   const el = document.createElement('div'); el.className = 'pdf-report';
   el.innerHTML = `<h1>${d.judul}</h1><p class="pdf-sub">Telemetri BBWS Pompengan Jeneberang · dicetak ${tgl}</p>` + blokPDF() +
@@ -429,7 +431,7 @@ $('th-filter').addEventListener('input', function (e) {
   const val = parseFloat(e.target.value);
   document.querySelectorAll('#tpm tr').forEach(tr => {
     const c = tr.children[2]; if (!c) return;
-    const mm = parseFloat(c.innerText.replace(/\./g, '').replace(',', '.'));
+    const mm = parseFloat(c.textContent.replace(/\./g, '').replace(',', '.'));
     tr.classList.toggle('highlight-row', !isNaN(val) && !isNaN(mm) && mm > val);
   });
 });
@@ -551,25 +553,64 @@ const pRn = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.tri
 const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND','NDJ'];
 const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/), i = SEAS.indexOf(p[0]); if (p.length >= 4 && i > -1 && isFinite(p[1]) && isFinite(p[3])) o[+p[1] + '-' + (i + 1)] = +p[3]; }); return { obs: o, name: 'NOAA CPC · oni.ascii.txt' }; };
 
+const OK_ = 'ch_oni_v1', DK = 'ch_data_v1';
+const bacaLS = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+const tulisLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+/* Semua sumber ENSO dipanggil BERSAMAAN (timeout 8 dtk), hasil dipilih menurut prioritas.
+   Sebelumnya berurutan dengan timeout 12 dtk masing-masing (bisa sampai 36 dtk). */
 async function ensoPilih() {
-  const err = [], nm = ['jembatan Apps Script', 'NOAA sstoi', 'NOAA Rnino34'];
-  const src = [async () => pBr(await ft(BRIDGE_URL)), async () => pSst(await ft(NOAA_SST)), async () => pRn(await ft(NOAA_RN))];
-  for (let i = 0; i < src.length; i++) {
-    try { const d = await src[i](); if (d && Object.keys(d.obs).length) { ENS = Object.assign(d, { mode: 'live', at: new Date(), err: err }); try { localStorage.setItem(CK, JSON.stringify(ENS)); } catch (e) {} return; } err.push(nm[i] + ': kosong'); } catch (e) { err.push(nm[i] + ': ' + (e.name === 'AbortError' ? 'timeout' : e.message)); }
+  const err = [];
+  const kand = [
+    ['jembatan Apps Script', async () => pBr(await ft(BRIDGE_URL, 8000))],
+    ['NOAA sstoi', async () => pSst(await ft(NOAA_SST, 8000))],
+    ['NOAA Rnino34', async () => pRn(await ft(NOAA_RN, 8000))]
+  ];
+  const jalan = kand.map(([nm, f]) => f().then(d => { if (!d || !Object.keys(d.obs).length) throw new Error('kosong'); return d; })
+    .catch(e => { err.push(nm + ': ' + (e.name === 'AbortError' ? 'timeout' : e.message)); return null; }));
+  for (const p of jalan) {
+    const d = await p;
+    if (d) { ENS = Object.assign(d, { mode: 'live', at: new Date(), err: err }); tulisLS(CK, ENS); return; }
   }
-  try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.obs) { ENS = Object.assign(c, { mode: 'cache', at: new Date(c.at), err: err }); return; } } catch (e) {}
+  const c = bacaLS(CK);
+  if (c && c.obs) { ENS = Object.assign(c, { mode: 'cache', at: new Date(c.at), err: err }); return; }
   ENS = { obs: {}, fcst: {}, mtd: {}, fauto: {}, name: 'Tanpa data ENSO (dianggap netral)', mode: 'none', at: null, err: err };
 }
-async function oniLoad() {
-  let d = null;
-  try { const r = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni'); const o = r.ok ? await r.json() : null; if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Satelit NOAA' }; } catch (e) {}
-  if (!d) { try { const x = pOni(await ft(NOAA_ONI)); if (Object.keys(x.obs).length) d = x; } catch (e) {} }
+function terapkanOni(d) {
   ONI = {}; let la = 0;
-  if (d) Object.keys(d.obs).forEach(k => { const p = k.split('-').map(Number); (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k]; la = Math.max(la, p[0] * 12 + p[1] - 1); });
-  const elOns = $('ons');
-if (elOns) elOns.textContent = la ? BLN[la % 12] + ' ' + Math.floor(la / 12) + ' (' + d.name + ')' : 'tidak tersedia';
+  if (d && d.obs) Object.keys(d.obs).forEach(k => { const p = k.split('-').map(Number); (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k]; la = Math.max(la, p[0] * 12 + p[1] - 1); });
+  const el = $('ons'); if (el) el.textContent = la ? BLN[la % 12] + ' ' + Math.floor(la / 12) + ' (' + d.name + ')' : 'tidak tersedia';
+}
+async function oniLoad() {
+  const pn = ft(NOAA_ONI, 8000).then(pOni).catch(() => null);   // cadangan, jalan paralel
+  let d = null;
+  try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Satelit NOAA' }; } catch (e) {}
+  if (!d) { const x = await pn; if (x && Object.keys(x.obs).length) d = x; }
+  if (d) tulisLS(OK_, d); else d = bacaLS(OK_);
+  terapkanOni(d);
 }
 async function ambilEnso() { await Promise.all([ensoPilih(), oniLoad()]); }
+
+/* ---------- Pemuat pustaka malas ---------- */
+function muatSkrip(src, integrity) {
+  return new Promise((ok, gagal) => {
+    const s = document.createElement('script'); s.src = src; if (integrity) { s.integrity = integrity; s.crossOrigin = ''; }
+    s.onload = ok; s.onerror = () => gagal(new Error('gagal memuat ' + src)); document.head.appendChild(s);
+  });
+}
+let leafletP = null;
+function muatLeaflet() {
+  if (typeof L !== 'undefined') return Promise.resolve();
+  if (leafletP) return leafletP;
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  css.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='; css.crossOrigin = ''; document.head.appendChild(css);
+  leafletP = muatSkrip('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=').catch(e => { leafletP = null; throw e; });
+  return leafletP;
+}
+function bukaPeta() {
+  muatLeaflet().then(() => { if (mode === 'semua') updateMap(); })
+    .catch(() => { $('mapleg').innerHTML = '<p class="note">Peta gagal dimuat (pustaka Leaflet tidak dapat diunduh). Periksa koneksi lalu muat ulang.</p>'; });
+}
 
 function proses(data) {
   A = {};
@@ -736,6 +777,7 @@ function initMap() {
   markerGrp = L.layerGroup().addTo(leafletMap);
 }
 function updateMap() {
+  if (typeof L === 'undefined') return;
   if (!leafletMap) initMap();
   leafletMap.invalidateSize();
   if (heatLayer) { leafletMap.removeLayer(heatLayer); heatLayer = null; }
@@ -905,7 +947,7 @@ function render() {
   $('thn').innerHTML = ys.map(y => `<option value="${y}">${y}</option>`).join(''); $('thn').value = tahun;
   $('prev').disabled = tahun <= ys[ys.length - 1]; $('next').disabled = tahun >= ys[0];
   if (py) { $('jd').textContent = 'Proyeksi Curah Hujan ' + nmKab(); proy(); }
-  else if (sm) { $('jd').textContent = 'Perbandingan Kabupaten'; kartuBanding(); chipBanding(); banding(); tabelBanding(); updateMap(); }
+  else if (sm) { $('jd').textContent = 'Perbandingan Kabupaten'; kartuBanding(); chipBanding(); banding(); tabelBanding(); bukaPeta(); }
   else {
     $('jd').textContent = 'Data Riwayat Hujan -> Kabupaten ' + nmKab();
     const rows = S().years[tahun] || Array(12).fill(null);
@@ -918,21 +960,39 @@ function pilihKab(id) { if (!A[id] || !Object.keys(A[id].years).length) return; 
 
 async function muat() {
   $('st').hidden = false; $('st').textContent = 'Memuat data…';
+  const cd = bacaLS(DK), ce = bacaLS(CK), co = bacaLS(OK_);
+  if (ce && ce.obs) ENS = Object.assign(ce, { mode: 'cache', at: new Date(ce.at), err: [] });
+  if (co) terapkanOni(co);
+  let tampil = false, ensPakai = null, oniPakai = null;
+  const tampilkan = () => {
+    if (!RAW || !Object.keys(RAW).length) return;
+    proses(RAW);
+    const ys = daftarTahun(); if (tahun == null || ys.indexOf(tahun) < 0) tahun = ys[0];
+    ensPakai = ENS; oniPakai = ONI;
+    $('st').hidden = true; $('app').hidden = false; tampil = true; render();
+  };
+  // 1) Kunjungan berulang: tampil seketika dari cache lokal
+  if (cd && cd.data) { RAW = cd.data; tampilkan(); }
+  // 2) Semua permintaan jaringan berjalan paralel, tidak saling menunggu
+  const pEns = ambilEnso().catch(() => {});
+  const pBatas = muatBatas();
   try {
-    const [res] = await Promise.all([fetch(API_URL + '?aksi=ch_bulanan&kab=semua'), ambilEnso()]);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const j = await res.json(); if (j.error) throw new Error(j.error);
-    RAW = j.data; proses(RAW);
-    await muatBatas();
-    const ys = daftarTahun(); tahun = ys[0];
-    $('st').hidden = true; $('app').hidden = false;
-    render();
-  } catch (e) { $('st').innerHTML = 'Gagal memuat (' + e.message + ')'; }
+    const j = JSON.parse(await ft(API_URL + '?aksi=ch_bulanan&kab=semua', 30000));
+    if (j.error) throw new Error(j.error);
+    RAW = j.data; tulisLS(DK, { at: Date.now(), data: RAW });
+    tampilkan();                       // tampil begitu data hujan tiba, tanpa menunggu ENSO
+  } catch (e) {
+    if (!tampil) { $('st').innerHTML = 'Gagal memuat (' + (e.name === 'AbortError' ? 'timeout' : e.message) + ') <button type="button" onclick="muat()">Coba lagi</button>'; return; }
+  }
+  await pEns;
+  if (tampil && (ENS !== ensPakai || ONI !== oniPakai)) tampilkan();   // hitung ulang bila ENSO baru tiba
+  await pBatas;
+  if (mode === 'semua' && leafletMap) updateMap();                    // pakai batas poligon bila terlambat tiba
 }
 
 $('md').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.dataset.m === mode) return; mode = b.dataset.m; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); });
 $('kb').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pilihKab(b.dataset.k); });
-$('chip').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; chipBanding(); banding(); updateMap(); });
+$('chip').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; chipBanding(); banding(); bukaPeta(); });
 $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); proses(RAW); render(); $('rf').disabled = false; };
 $('thn').onchange = e => pilihTahun(+e.target.value);
 $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
