@@ -680,8 +680,11 @@ const kunci = s => String(s || '').toLowerCase().replace(/kabupaten|kab\.|\s|-/g
 const ALIAS = { bone: ['bone'], soppeng: ['soppeng'], wajo: ['wajo'], sidrap: ['sidrap', 'sidenrengrappang'] };
 function idDariFitur(f) {
   const p = f.properties || {};
-  const n = kunci(p.NAME_2 || p.name || p.NAMOBJ || p.WADMKK || p.kabkot || p.nm_kab || '');
-  return Object.keys(ALIAS).find(id => ALIAS[id].indexOf(n) > -1) || null;
+  for (const v of Object.values(p)) {
+    const n = kunci(v), id = Object.keys(ALIAS).find(i => ALIAS[i].indexOf(n) > -1);
+    if (id) return id;
+  }
+  return null;
 }
 async function muatBatas() {
   try {
