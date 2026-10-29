@@ -131,8 +131,8 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 </head>
 <body>
 <div class="wrap">
-  <h1 id="jd">Data Riwayat Curah Hujan Tahunan</h1>
-  <p class="sub" id="upd">Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos per kabupaten · ONI s.d. <span id="ons">…</span></p>
+  <h1 id="jd">Data Riwayat Curah Hujan Tahunan Bone, Soppeng, Wajo, Sidrap</h1>
+  <p class="sub" id="upd">Sumber Data: Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos per kabupaten · Data ONI s.d. <span id="ons">…</span></p>
 
   <div id="st" role="status">Memuat data…</div>
 
@@ -148,12 +148,12 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
     </div>
     
     <div class="bar" id="bk">
-        <span class="lb">Kabupaten</span><div class="seg" id="kb" role="group" aria-label="Pilih kabupaten"></div>
+        <span class="lb">Pilih Kabupaten</span><div class="seg" id="kb" role="group" aria-label="Pilih kabupaten"></div>
     </div>
     
     <div class="bar" id="bt">
       <div class="bar-left">
-          <label for="thn">Tahun</label>
+          <label for="thn">Pilih Tahun</label>
           <button id="prev" type="button" aria-label="Tahun sebelumnya">‹</button>
           <select id="thn"></select>
           <button id="next" type="button" aria-label="Tahun berikutnya">›</button>
@@ -295,7 +295,7 @@ const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
 const NOAA_RN = 'https://www.cpc.ncep.noaa.gov/data/indices/Rnino34.ascii.txt';
 
-const KAB = [{ id: 'bone', nm: 'Bone', lat: -4.8, lng: 120.12 }, { id: 'soppeng', nm: 'Soppeng', lat: -4.35, lng: 119.88 }, { id: 'sidrap', nm: 'Sidrap', lat: -3.93, lng: 119.85 }, { id: 'wajo', nm: 'Wajo', lat: -4.09, lng: 120.16 }];
+const KAB = [{ id: 'bone', nm: 'Bone', lat: -4.8, lng: 120.12 }, { id: 'soppeng', nm: 'Soppeng', lat: -4.35, lng: 119.88 }, { id: 'wajo', nm: 'Wajo', lat: -4.09, lng: 120.16 }, { id: 'sidrap', nm: 'Sidrap', lat: -3.93, lng: 119.85 }];
 const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => n == null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -410,7 +410,7 @@ function blokPDF() {
     return `<div class="pdf-keep"><h3>Proyeksi 12 bulan ke depan (mm)</h3>${$('pc').innerHTML}<p class="pdf-leg">Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90</p></div>` +
       `<div class="pdf-keep"><h3>Indikasi hidrologis 12 bulan</h3>${$('agri-cal').outerHTML}<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div><p class="pdf-leg">Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)</p></div>`;
   }
-  return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata semua tahun · batang pudar = data belum lengkap</p></div>` +
+  return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap</p></div>` +
     `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`;
 }
 function unduhPDF() {
@@ -560,7 +560,7 @@ async function ensoPilih() {
 }
 async function oniLoad() {
   let d = null;
-  try { const r = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni'); const o = r.ok ? await r.json() : null; if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Spreadsheet (Apps Script)' }; } catch (e) {}
+  try { const r = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni'); const o = r.ok ? await r.json() : null; if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Satelit NOAA' }; } catch (e) {}
   if (!d) { try { const x = pOni(await ft(NOAA_ONI)); if (Object.keys(x.obs).length) d = x; } catch (e) {} }
   ONI = {}; let la = 0;
   if (d) Object.keys(d.obs).forEach(k => { const p = k.split('-').map(Number); (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k]; la = Math.max(la, p[0] * 12 + p[1] - 1); });
@@ -858,7 +858,7 @@ function render() {
   if (py) { $('jd').textContent = 'Proyeksi Curah Hujan ' + nmKab(); proy(); }
   else if (sm) { $('jd').textContent = 'Perbandingan Kabupaten'; kartuBanding(); chipBanding(); banding(); tabelBanding(); updateMap(); }
   else {
-    $('jd').textContent = 'Riwayat Hujan Kabupaten ' + nmKab();
+    $('jd').textContent = 'Data Riwayat Hujan -> Kabupaten ' + nmKab();
     const rows = S().years[tahun] || Array(12).fill(null);
     kartu(rows); gambar(rows); gambarEnso(); tabel(rows);
   }
