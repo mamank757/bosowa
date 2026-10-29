@@ -747,8 +747,17 @@ function updateMap() {
   if (ada) {
     geoLayer = L.geoJSON(geoData, {
       filter: f => !!nilai[idDariFitur(f)],
-      style: f => { const p = nilai[idDariFitur(f)], c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
-        return { fillColor: 'rgb(' + c + ')', fillOpacity: .85, color: '#fff', weight: 1.5 }; },
+      style: f => { 
+  const p = nilai[idDariFitur(f)];
+  const c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
+  
+  return { 
+    fillColor: 'rgb(' + c.join(',') + ')', // Gunakan .join(',') agar string array diproses dengan aman
+    fillOpacity: 0.85, 
+    color: 'red', // Paksa garis tepi berwarna merah agar pasti terlihat
+    weight: 2 
+  }; 
+},
       onEachFeature: (f, l) => { const p = nilai[idDariFitur(f)];
         l.bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'center', className: 'map-lbl' }); }
     }).addTo(leafletMap);
