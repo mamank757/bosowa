@@ -406,7 +406,7 @@ function blokPDF() {
     return `<div class="pdf-keep"><h3>Perbandingan curah hujan bulanan (mm)</h3>${$('cmp').innerHTML}<p class="pdf-leg">${lg} · titik berongga = bulan belum lengkap</p></div>` + blokPetaPDF();
   }
   if (mode === 'proy') {
-    const lb = PM.filter(c => !c.none).map(c => `<span style="flex:1;text-align:center">${BLN[c.m.mo - 1].slice(0, 3)}</span>`).join('');
+    const lb = PM.filter(c => !c.none).map(c => `<span style="flex:1;text-align:center">${BLN[c.m.mo - 1].slice(0, 3)} ${String(c.m.y).slice(2)}</span>`).join('');
     return `<div class="pdf-keep"><h3>Proyeksi 12 bulan ke depan (mm)</h3>${$('pc').innerHTML}<p class="pdf-leg">Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90</p></div>` +
       `<div class="pdf-keep"><h3>Indikasi hidrologis 12 bulan</h3>${$('agri-cal').outerHTML}<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div><p class="pdf-leg">Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)</p></div>`;
   }
@@ -784,7 +784,7 @@ function renderAgriTimeline(pmArray) {
     pmArray.forEach(c => {
         if(c.none) return;
         let color = c.mean < 100 ? "var(--kritis)" : c.mean <= 200 ? "var(--menengah)" : "var(--aman)";
-        let title = `${BLN[c.m.mo-1].slice(0,3)}: ${fmt(c.mean,0)}mm`;
+        let title = `${BLN[c.m.mo-1].slice(0,3)} ${String(c.m.y).slice(2)}: ${fmt(c.mean,0)}mm`;
         s += `<div style="background:${color}" data-title="${title}"></div>`;
     });
     $('agri-cal').innerHTML = s;
@@ -814,7 +814,7 @@ function proy() {
 
   $('pbg').className = 'badge ' + ENS.mode; $('pbg').textContent = ENS.mode;
   $('psl').textContent = ENS.name;
-  $('es').innerHTML = ens.map((r, i) => `<div class="ec"><span>${BLN[MONTHS[i].mo - 1].slice(0, 3)}</span><b class="${kls(r.v)}">${sg(r.v)}</b><small>${SB[r.s]}</small></div>`).join('');
+  $('es').innerHTML = ens.map((r, i) => `<div class="ec"><span>${BLN[MONTHS[i].mo - 1].slice(0, 3)} ${String(MONTHS[i].y).slice(2)}</span><b class="${kls(r.v)}">${sg(r.v)}</b><small>${SB[r.s]}</small></div>`).join('');
 
   grafikProy();
   
@@ -838,7 +838,10 @@ function grafikProy() {
   for (let v = 0; v <= top + 1e-9; v += st) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
   PM.forEach((c, i) => {
     const cx = m.l + cw * (i + .5);
-    s += `<text x="${cx}" y="${H - 26}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[c.m.mo - 1].slice(0, 3)}</text>`;
+    const yy = String(c.m.y).slice(2), bn = BLN[c.m.mo - 1].slice(0, 3);
+s += u.kecil
+  ? `<text x="${cx}" y="${H - 28}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn}</text><text x="${cx}" y="${H - 13}" text-anchor="middle" font-size="${fa}" fill="var(--mut)">${yy}</text>`
+  : `<text x="${cx}" y="${H - 26}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn} <tspan fill="var(--mut)" font-weight="500">${yy}</tspan></text>`;
     if (c.none) return;
     const tip = `${bl(c.m)}: Model ${fmt(c.mean, 0)} mm | Baseline ${fmt(c.Nm, 0)} mm | ${CN[c.cat]}`;
     s += `<rect x="${cx - bw / 2}" y="${Y(c.Nm)}" width="${bw}" height="${Math.max(1.5, c.Nm / top * ph)}" rx="3" fill="var(--mut)" opacity=".25" stroke="var(--mut)" data-tip="${tip}"/>` +
