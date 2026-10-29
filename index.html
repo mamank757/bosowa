@@ -674,7 +674,7 @@ function tabel(rows) {
 
 /* ---------- Tab Banding & Leaflet ---------- */
 /* ---------- Peta + ilustrasi sebaran (IDW) ---------- */
-const GEOJSON_URL = 'https://raw.githubusercontent.com/AlfianAliM/Indonesia-GeoJSON/master/kab_kota.geojson';
+const GEOJSON_URL = 'bosowa.json';   // ganti dengan lokasi file Anda
 let geoData = null, geoLayer = null;
 const kunci = s => String(s || '').toLowerCase().replace(/kabupaten|kab\.|\s|-/g, '');
 const ALIAS = { bone: ['bone'], soppeng: ['soppeng'], wajo: ['wajo'], sidrap: ['sidrap', 'sidenrengrappang'] };
@@ -747,35 +747,26 @@ function updateMap() {
   if (ada) {
     geoLayer = L.geoJSON(geoData, {
       filter: f => !!nilai[idDariFitur(f)],
-      style: f => {
-        const p = nilai[idDariFitur(f)];
-        const rentang = Math.max(1, S_.vmax - S_.vmin);
-        const c = warna((p.v - S_.vmin) / rentang);
-        return {
-          fillColor: 'rgb(' + c.join(',') + ')',
-          fillOpacity: 0.88,
-          color: '#17372b',
-          opacity: 1,
-          weight: 2.5
-        };
-      },
+      style: f => { 
+  const p = nilai[idDariFitur(f)];
+  const c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
+  
+  return { 
+    fillColor: 'rgb(' + c.join(',') + ')', // Gunakan .join(',') agar string array diproses dengan aman
+    fillOpacity: 0.85, 
+    color: 'red', // Paksa garis tepi berwarna merah agar pasti terlihat
+    weight: 2 
+  }; 
+},
       onEachFeature: (f, l) => { const p = nilai[idDariFitur(f)];
         l.bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'center', className: 'map-lbl' }); }
     }).addTo(leafletMap);
     if (!mapFit && geoLayer.getBounds().isValid()) { leafletMap.fitBounds(geoLayer.getBounds().pad(.1)); mapFit = true; }
   } else {
-    // Jangan menampilkan interpolasi IDW sebagai choropleth administratif.
-    S_.pts.forEach(p => L.circleMarker([p.lat, p.lng], {
-      radius: 6, fillColor: '#14211a', fillOpacity: 1, color: '#fff', weight: 2
-    }).bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, {
-      permanent: true, direction: 'top', offset: [0, -6], className: 'map-lbl'
-    }).addTo(markerGrp));
-    if (!mapFit) {
-      leafletMap.fitBounds(L.latLngBounds(S_.pts.map(p => [p.lat, p.lng])).pad(.6));
-      mapFit = true;
-    }
-    $('mapleg').innerHTML = '<p class="note">Batas kabupaten belum berhasil dimuat. Periksa koneksi internet atau sumber GeoJSON. Warna poligon belum ditampilkan agar tidak memberi kesan sebaran spasial yang keliru.</p>';
-    return;
+    heatLayer = L.imageOverlay(citraSebaran(S_), [[B.s, B.w], [B.n, B.e]], { interactive: false }).addTo(leafletMap);
+    S_.pts.forEach(p => L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: '#14211a', fillOpacity: 1, color: '#fff', weight: 2 })
+      .bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'top', offset: [0, -6], className: 'map-lbl' }).addTo(markerGrp));
+    if (!mapFit) { leafletMap.fitBounds(L.latLngBounds(S_.pts.map(p => [p.lat, p.lng])).pad(.6)); mapFit = true; }
   }
   $('mapleg').innerHTML = legendHtml(S_, ada);
 }
