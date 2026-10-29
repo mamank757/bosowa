@@ -200,7 +200,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script (berakhiran /exec). Butuh aksi ch_bulanan (Kabupaten.gs) dan oni
-const API_URL = 'https://script.google.com/macros/s/AKfycbwd7ZgHlKgNuyrzEC2s727Cls7gA3H0OLJ07dDJrHmOYVL_j0pkX08hJYtE74WvFto8/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzHmd64Bj2JEFTJG4ufKJcMeutW-6f0XJE7vB5skyCIxaCZbTEqaKbWth0nduKAyoDS/exec';
 // Proyeksi memakai Niño-3.4 bulanan dari jembatan Apps Script (seri NOAA + MTD + Sheet prakiraan + analog), cadangan NOAA CPC langsung.
 // Tab riwayat memakai ONI dari spreadsheet (aksi=oni), cadangan NOAA oni.ascii.txt.
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
@@ -244,7 +244,7 @@ function pearson(p) {
 }
 
 /* ================= MESIN PROYEKSI (GLM log-link + ENSO lag + Gamma) ================= */
-const MIN_N = 6, SHRINK = 8, TAU = 6, E_LO = -2, E_HI = 2.5, F_LO = .3, F_HI = 2.5, T_MIN = 1.65, ATT = .35, CK = 'ch_ens_v2';
+const MIN_N = 8, SHRINK = 8, TAU = 6, E_LO = -2, E_HI = 2.5, F_LO = .3, F_HI = 2.5, T_MIN = 1.65, ATT = .35, CK = 'ch_ens_v2';
 const now = new Date(), NOWZ = now.getFullYear() * 12 + now.getMonth(), REPORT_YEAR = now.getFullYear();
 const mk = z => ({ y: Math.floor(z / 12), mo: z % 12 + 1 });
 const MONTHS = Array.from({ length: 12 }, (_, i) => mk(NOWZ + 1 + i));
