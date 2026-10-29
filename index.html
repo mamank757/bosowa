@@ -127,6 +127,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .pdf-dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#14211a;border:2px solid #fff}
 .pdf-lbl{position:absolute;transform:translate(-50%,-135%);font-size:10px;font-weight:700;text-align:center;white-space:nowrap;background:rgba(255,255,255,.88);padding:1px 4px;border-radius:3px;line-height:1.2}
 .pdf-side{flex:1}
+#th-filter{width:150px;max-width:none;font-size:.85rem;padding:6px 10px;min-height:36px}
 </style>
 </head>
 <body>
@@ -259,7 +260,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
       <section class="box">
         <h2 id="jp3">
             <span>Total per bulan & Kalender Tanam</span>
-            <input type="number" id="th-filter" placeholder="Sorot > X mm" title="Ketik ambang curah hujan untuk menyorot bulan ekstrem">
+           <input type="number" id="th-filter" placeholder="Sorot > … mm" title="Ketik ambang curah hujan (mm) untuk menyorot bulan dengan proyeksi di atas angka itu">
         </h2>
         <div class="tw"><table id="tbl-proyeksi">
           <thead><tr><th>Bulan</th><th>Baseline</th><th>Proyeksi</th><th>P10–P90</th><th>%</th><th>Niño-3.4</th><th>Faktor F</th><th>n / t</th><th>Peluang BN / N / AN</th><th>Kategori</th></tr></thead>
