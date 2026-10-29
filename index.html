@@ -674,6 +674,22 @@ function tabel(rows) {
 
 /* ---------- Tab Banding & Leaflet ---------- */
 /* ---------- Peta + ilustrasi sebaran (IDW) ---------- */
+const GEOJSON_URL = 'bosowa.geojson';   // ganti dengan lokasi file Anda
+let geoData = null, geoLayer = null;
+const kunci = s => String(s || '').toLowerCase().replace(/kabupaten|kab\.|\s|-/g, '');
+const ALIAS = { bone: ['bone'], soppeng: ['soppeng'], wajo: ['wajo'], sidrap: ['sidrap', 'sidenrengrappang'] };
+function idDariFitur(f) {
+  const p = f.properties || {};
+  const n = kunci(p.NAME_2 || p.name || p.NAMOBJ || p.WADMKK || p.kabkot || p.nm_kab || '');
+  return Object.keys(ALIAS).find(id => ALIAS[id].indexOf(n) > -1) || null;
+}
+async function muatBatas() {
+  try {
+    const r = await fetch(GEOJSON_URL); if (!r.ok) throw new Error('HTTP ' + r.status);
+    geoData = await r.json();
+    if (!geoData.features.some(f => idDariFitur(f))) console.warn('Batas dimuat, tapi tidak ada nama kabupaten yang cocok. Contoh properti:', geoData.features[0] && geoData.features[0].properties);
+  } catch (e) { console.warn('Batas wilayah tidak dimuat, memakai peta sebaran IDW.', e); geoData = null; }
+}
 const B = { s: -5.2, n: -3.6, w: 119.5, e: 120.5 };
 const SKALA = [[219,238,250],[158,202,225],[66,146,198],[33,113,181],[8,48,107]];
 let heatLayer = null, markerGrp = null, mapFit = false;
@@ -702,10 +718,12 @@ function citraSebaran(S_) {
   }
   ctx.putImageData(img, 0, 0); return cv.toDataURL();
 }
-function legendHtml(S_) {
+function legendHtml(S_, poligon) {
   const grad = SKALA.map(c => `rgb(${c})`).join(',');
-  return `<div class="mapleg"><span>${fmt(S_.vmin, 0)} mm</span><i style="background:linear-gradient(90deg,${grad})"></i><span>${fmt(S_.vmax, 0)} mm</span></div>` +
-    `<p class="note">Ilustrasi sebaran total hujan ${tahun} dari interpolasi IDW atas rata-rata ${S_.pts.length} kabupaten (titik = pusat kabupaten). Warna di antara titik adalah perkiraan, bukan hasil pengukuran, dan tidak mengikuti batas administrasi.</p>`;
+  const cat = poligon
+    ? `Warna menunjukkan total hujan ${tahun} (rata-rata seluruh pos per kabupaten), diisi seragam di seluruh wilayah kabupaten.`
+    : `Ilustrasi sebaran total hujan ${tahun} dari interpolasi IDW atas rata-rata ${S_.pts.length} kabupaten (titik = pusat kabupaten). Warna di antara titik adalah perkiraan, bukan hasil pengukuran, dan tidak mengikuti batas administrasi.`;
+  return `<div class="mapleg"><span>${fmt(S_.vmin, 0)} mm</span><i style="background:linear-gradient(90deg,${grad})"></i><span>${fmt(S_.vmax, 0)} mm</span></div><p class="note">${cat}</p>`;
 }
 function initMap() {
   if (leafletMap !== null) return;
@@ -717,14 +735,28 @@ function updateMap() {
   if (!leafletMap) initMap();
   leafletMap.invalidateSize();
   if (heatLayer) { leafletMap.removeLayer(heatLayer); heatLayer = null; }
+  if (geoLayer) { leafletMap.removeLayer(geoLayer); geoLayer = null; }
   markerGrp.clearLayers();
   const S_ = titikSebaran();
   if (!S_) { $('mapleg').innerHTML = '<p class="note">Belum ada data curah hujan untuk tahun ini.</p>'; return; }
-  heatLayer = L.imageOverlay(citraSebaran(S_), [[B.s, B.w], [B.n, B.e]], { interactive: false }).addTo(leafletMap);
-  S_.pts.forEach(p => L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: '#14211a', fillOpacity: 1, color: '#fff', weight: 2 })
-    .bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'top', offset: [0, -6], className: 'map-lbl' }).addTo(markerGrp));
-  if (!mapFit) { leafletMap.fitBounds(L.latLngBounds(S_.pts.map(p => [p.lat, p.lng])).pad(.6)); mapFit = true; }
-  $('mapleg').innerHTML = legendHtml(S_);
+  const nilai = {}; S_.pts.forEach(p => { nilai[p.id] = p; });
+  const ada = geoData && geoData.features.some(f => nilai[idDariFitur(f)]);
+  if (ada) {
+    geoLayer = L.geoJSON(geoData, {
+      filter: f => !!nilai[idDariFitur(f)],
+      style: f => { const p = nilai[idDariFitur(f)], c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
+        return { fillColor: 'rgb(' + c + ')', fillOpacity: .85, color: '#fff', weight: 1.5 }; },
+      onEachFeature: (f, l) => { const p = nilai[idDariFitur(f)];
+        l.bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'center', className: 'map-lbl' }); }
+    }).addTo(leafletMap);
+    if (!mapFit && geoLayer.getBounds().isValid()) { leafletMap.fitBounds(geoLayer.getBounds().pad(.1)); mapFit = true; }
+  } else {
+    heatLayer = L.imageOverlay(citraSebaran(S_), [[B.s, B.w], [B.n, B.e]], { interactive: false }).addTo(leafletMap);
+    S_.pts.forEach(p => L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: '#14211a', fillOpacity: 1, color: '#fff', weight: 2 })
+      .bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'top', offset: [0, -6], className: 'map-lbl' }).addTo(markerGrp));
+    if (!mapFit) { leafletMap.fitBounds(L.latLngBounds(S_.pts.map(p => [p.lat, p.lng])).pad(.6)); mapFit = true; }
+  }
+  $('mapleg').innerHTML = legendHtml(S_, ada);
 }
 
 function kartuBanding() {
@@ -878,6 +910,7 @@ async function muat() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const j = await res.json(); if (j.error) throw new Error(j.error);
     RAW = j.data; proses(RAW);
+    await muatBatas();
     const ys = daftarTahun(); tahun = ys[0];
     $('st').hidden = true; $('app').hidden = false;
     render();
