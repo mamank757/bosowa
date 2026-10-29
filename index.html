@@ -4,20 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riwayat dan Proyeksi Curah Hujan Kabupaten</title>
+
+<!-- External Libraries for Map and PDF -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <style>
-:root{--bg:#f3f6f4;--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1713;--card:#17231d;--ink:#e6efe9;--mut:#9fb0a5;--line:#2a3a31;--bar:#4aa8d8;--base:#f0a24f;--hi:#8fd0f2;--warm:#ff7b6b;--cool:#a998f0;--c0:#4aa8d8;--c1:#f0a24f;--c2:#4fc9a8;--c3:#b49cf5}}
+:root{--bg:#f3f6f4;--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0;--kritis:#e74c3c;--menengah:#f1c40f;--aman:#2ecc71;}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1713;--card:#17231d;--ink:#e6efe9;--mut:#9fb0a5;--line:#2a3a31;--bar:#4aa8d8;--base:#f0a24f;--hi:#8fd0f2;--warm:#ff7b6b;--cool:#a998f0;--c0:#4aa8d8;--c1:#f0a24f;--c2:#4fc9a8;--c3:#b49cf5;--kritis:#c0392b;--menengah:#d35400;--aman:#27ae60;}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:980px;margin:0 auto;padding:20px 16px 40px}
 h1{margin:0 0 2px;font-size:clamp(1.3rem,4.5vw,1.9rem);line-height:1.2}
 .sub{margin:0 0 16px;color:var(--mut);font-size:.9rem}
-.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px; justify-content: space-between;}
+.bar-left, .bar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .bar label,.bar .lb{font-weight:600}
-select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px}
+select,button,input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px}
 select{font-weight:700;min-width:110px}
-button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
+input{max-width: 140px;}
+button{cursor:pointer; font-weight: 600;} button:disabled{opacity:.4;cursor:default}
 :focus-visible{outline:3px solid var(--bar);outline-offset:2px}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 .seg button{font-weight:600;border-radius:999px;padding:8px 16px}
@@ -32,15 +40,17 @@ button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
 .chip .dot{margin:0}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
 .card,.box{background:var(--card);border:1px solid var(--line);border-radius:14px}
-.card{padding:14px 16px;min-width:0;overflow-wrap:anywhere}
+.card{padding:14px 16px;min-width:0;overflow-wrap:anywhere;position: relative;}
 .card .k{font-size:.74rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
 .card .v{font-size:1.6rem;font-weight:800;line-height:1.2;color:var(--hi)}
 .card .v small{font-size:.82rem;font-weight:600;color:var(--mut)}
 .card .s{font-size:.78rem;color:var(--mut)}
 .box{padding:14px 16px;margin-bottom:16px}
-.box h2{margin:0 0 8px;font-size:1.05rem}
+.box h2{margin:0 0 8px;font-size:1.05rem; display: flex; justify-content: space-between; align-items: center;}
 .ring{margin:0 0 16px;font-size:.92rem}
 svg{display:block;width:100%;height:auto}
+svg rect, svg circle { transition: filter 0.2s; cursor: crosshair; }
+svg rect:hover, svg circle:hover { filter: brightness(1.2) drop-shadow(0 0 2px rgba(255,255,255,0.5)); }
 .leg{display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:var(--mut);margin-top:6px}
 .leg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
 .leg i.ho{border-radius:50%;background:var(--card);border:2px solid var(--mut)}
@@ -49,7 +59,7 @@ table{width:100%;border-collapse:collapse;min-width:760px;font-size:.88rem}
 #vb table{min-width:480px}
 #vp table{min-width:720px}
 #vp #tsr{min-width:620px}
-th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap; transition: background 0.3s;}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--mut);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
 tbody tr:last-child td{border-bottom:0}
@@ -63,6 +73,10 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .status button{min-height:34px;padding:4px 12px;font-size:.82rem}
 .badge{padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;background:rgba(115,135,184,.2);color:var(--mut)}
 .badge.live{background:rgba(30,158,126,.18);color:var(--c2)}.badge.cache,.badge.none{background:rgba(217,130,43,.18);color:var(--c1)}
+.badge-warn { position: absolute; top: -10px; right: -5px; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; background: var(--warm); color: #fff; animation: pulse 2s infinite; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+.badge-flood { background: var(--hi); }
+@keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); } }
+
 .es{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:6px;margin-top:10px}
 .ec{border:1px solid var(--line);border-radius:10px;padding:6px 2px;text-align:center}
 .ec span{display:block;font-size:.74rem;color:var(--mut)}.ec b{display:block;font-size:.98rem}
@@ -71,6 +85,18 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .cat.bn{background:rgba(217,130,43,.16);color:var(--c1)}.cat.n{background:rgba(115,135,184,.18);color:var(--mut)}.cat.an{background:rgba(30,158,126,.16);color:var(--c2)}
 .pr{display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .pb{display:flex;height:8px;width:90px;border-radius:4px;overflow:hidden;background:var(--line)}.pb i{display:block;height:100%}
+
+/* Tooltip & Map Styles */
+.glass-tooltip { position: fixed; top: 0; left: 0; background: rgba(20,33,26,0.85); color: #fff; padding: 8px 14px; border-radius: 8px; pointer-events: none; z-index: 1000; font-size: 13px; font-weight: 500; backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.1); opacity: 0; transition: opacity 0.15s ease-in-out; white-space: nowrap; transform: translate(-50%, -120%); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.glass-tooltip.show { opacity: 1; }
+#map { height: 350px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--line); }
+.highlight-row td { background-color: rgba(192, 57, 43, 0.15) !important; color: var(--warm); font-weight: bold; }
+
+/* Plant Calendar Timeline */
+.agri-timeline { display: flex; margin-top: 12px; height: 16px; border-radius: 8px; overflow: hidden; background: var(--line); }
+.agri-timeline > div { flex: 1; text-align: center; font-size: 0.6rem; color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; position: relative; }
+.agri-timeline > div:hover::after { content: attr(data-title); position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; padding: 4px 8px; border-radius: 4px; white-space: nowrap; z-index: 10; }
+
 @media(max-width:620px){
 .wrap{padding:16px 10px 32px}
 .cards{grid-template-columns:repeat(2,1fr);gap:8px}
@@ -81,24 +107,57 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .box{padding:12px 8px}
 .box h2,.box .leg,.box .note,.box .chip,.box .status,.box .es{padding:0 4px}
 .mode{flex-wrap:wrap}
+.bar { flex-direction: column; align-items: flex-start; }
 }
+.map-lbl{background:rgba(20,33,26,.88);color:#fff;border:0;font-weight:600;box-shadow:none}
+.leaflet-tooltip-top.map-lbl::before{border-top-color:rgba(20,33,26,.88)}
+.mapleg{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--mut);margin-top:8px}
+.mapleg i{flex:1;max-width:320px;height:12px;border-radius:6px;border:1px solid var(--line)}
+.pdf-report{--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0;--kritis:#e74c3c;--menengah:#f1c40f;--aman:#2ecc71;background:#fff;color:var(--ink);font:12px/1.45 system-ui,sans-serif;padding:4px}
+.pdf-report h1{font-size:20px;margin:0}
+.pdf-report h3{font-size:13px;margin:14px 0 4px}
+.pdf-sub,.pdf-leg{color:var(--mut);font-size:11px;margin:2px 0 6px}
+.pdf-report table{min-width:0;font-size:11px;margin-top:6px}
+.pdf-report th,.pdf-report td{padding:5px 6px;white-space:nowrap}
+.pdf-report thead th{background:#f3f6f4}
+.pdf-report td.t{text-align:left}
+.pdf-peta{display:flex;gap:18px;align-items:flex-start}
+.pdf-map{position:relative;width:300px;height:480px;flex:none;background:#e8eeea;border:1px solid var(--line)}
+.pdf-map img{width:100%;height:100%;display:block}
+.pdf-dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#14211a;border:2px solid #fff}
+.pdf-lbl{position:absolute;transform:translate(-50%,-135%);font-size:10px;font-weight:700;text-align:center;white-space:nowrap;background:rgba(255,255,255,.88);padding:1px 4px;border-radius:3px;line-height:1.2}
+.pdf-side{flex:1}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1 id="jd">Data Riwayat Curah Hujan Tahunan</h1>
-  <p class="sub" id="upd">Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos yang melapor per kabupaten</p>
+  <p class="sub" id="upd">Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos per kabupaten · ONI s.d. <span id="ons">…</span></p>
 
   <div id="st" role="status">Memuat data…</div>
 
   <div id="app" hidden>
-    <div class="bar"><div class="seg mode" id="md" role="group" aria-label="Mode tampilan"></div></div>
-    <div class="bar" id="bk"><span class="lb">Kabupaten</span><div class="seg" id="kb" role="group" aria-label="Pilih kabupaten"></div></div>
+    <div class="bar">
+        <div class="bar-left">
+            <div class="seg mode" id="md" role="group" aria-label="Mode tampilan"></div>
+        </div>
+        <div class="bar-right">
+            <button onclick="unduhPDF()" title="Ekspor laporan ke PDF">📄 Ekspor PDF</button>
+<button onclick="unduhCSV()">📥 Unduh Data CSV</button>
+        </div>
+    </div>
+    
+    <div class="bar" id="bk">
+        <span class="lb">Kabupaten</span><div class="seg" id="kb" role="group" aria-label="Pilih kabupaten"></div>
+    </div>
+    
     <div class="bar" id="bt">
-      <label for="thn">Tahun</label>
-      <button id="prev" type="button" aria-label="Tahun sebelumnya">‹</button>
-      <select id="thn"></select>
-      <button id="next" type="button" aria-label="Tahun berikutnya">›</button>
+      <div class="bar-left">
+          <label for="thn">Tahun</label>
+          <button id="prev" type="button" aria-label="Tahun sebelumnya">‹</button>
+          <select id="thn"></select>
+          <button id="next" type="button" aria-label="Tahun berikutnya">›</button>
+      </div>
     </div>
 
     <div id="vk">
@@ -123,21 +182,31 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
           <span><i style="background:var(--cool)"></i>La Niña (ONI ≤ −0,5)</span>
           <span><i style="background:var(--mut);opacity:.5"></i>Netral</span>
         </div>
-        <p class="note">ONI = anomali suhu laut Niño 3.4, rerata 3 bulan berpusat pada bulan tersebut (NOAA CPC), terakhir sampai <span id="ons">–</span>; dua bulan terakhir dapat direvisi NOAA. Korelasi dihitung antara ONI dan anomali hujan bulanan (selisih % terhadap rata-rata bulan yang sama, dibatasi −100% sampai +200%), hanya dari bulan lengkap dengan pos aktif. Nilai negatif berarti El Niño cenderung disertai hujan di bawah normal. Korelasi bukan bukti sebab-akibat.<span id="pn"></span></p>
+        <p class="note">ONI = anomali suhu laut Niño 3.4 (NOAA CPC). Korelasi dihitung antara ONI dan anomali hujan bulanan.<span id="pn"></span></p>
       </section>
 
       <section class="box">
         <h2 id="jt">Rincian per bulan</h2>
-        <div class="tw"><table>
-          <thead><tr><th>Bulan</th><th>Total (mm)</th><th>Rata-rata/hari</th><th>Data (hari)</th><th>Pos aktif</th><th>Rata-rata bulan ini</th><th>% rata-rata</th><th>ENSO (ONI)</th></tr></thead>
+        <div class="tw"><table id="tbl-riwayat">
+          <thead><tr><th>Bulan</th><th>Total (mm)</th><th>Rata-rata/hari</th><th>Data (hari)</th><th>Pos aktif</th><th>Rata-rata bln ini</th><th>% rata-rata</th><th>ENSO (ONI)</th></tr></thead>
           <tbody id="tb"></tbody><tfoot id="tf"></tfoot>
         </table></div>
+        <div style="text-align: right; margin-top: 10px;">
+            <button onclick="unduhCSV('tbl-riwayat', 'Riwayat_Hujan.csv')">📥 Unduh Data CSV</button>
+        </div>
         <p class="note" id="nt"></p>
       </section>
     </div>
 
     <div id="vb" hidden>
       <div class="cards" id="cb"></div>
+
+      <section class="box">
+        <h2>Peta Sebaran Curah Hujan Tahunan</h2>
+        <p class="sub" style="margin-top:-5px;">Distribusi volume spasial untuk wilayah Wajo, Bone, Soppeng, Sidrap</p>
+        <div id="map"></div>
+<div id="mapleg"></div>
+      </section>
 
       <section class="box">
         <h2 id="jb">Total curah hujan per bulan</h2>
@@ -148,9 +217,12 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
       <section class="box">
         <h2 id="jbt">Rincian per bulan</h2>
-        <div class="tw"><table>
+        <div class="tw"><table id="tbl-banding">
           <thead id="hb"></thead><tbody id="tbb"></tbody><tfoot id="tfb"></tfoot>
         </table></div>
+        <div style="text-align: right; margin-top: 10px;">
+            <button onclick="unduhCSV('tbl-banding', 'Banding_Kabupaten.csv')">📥 Unduh Data CSV</button>
+        </div>
         <p class="note" id="nb"></p>
       </section>
     </div>
@@ -164,7 +236,6 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
           <thead><tr><th>Kabupaten</th><th>Normal 12 bln (mm)</th><th>Proyeksi 12 bln (mm)</th><th>% normal</th><th id="thy">Total tahun ini</th><th>Kategori bulanan</th><th>Koreksi ENSO · n pasangan</th></tr></thead>
           <tbody id="tsb"></tbody>
         </table></div>
-        <p class="note">Kategori bulanan = jumlah bulan dengan peluang tertinggi Bawah Normal (BN), Normal (N), atau Atas Normal (AN). Koreksi ENSO = jumlah bulan yang kalibrasinya memenuhi syarat dari 12 bulan proyeksi. n = jumlah tahun berpasangan hujan–ENSO untuk bulan itu (syarat minimal 8); t = uji-t koefisien ENSO (syarat |t| ≥ 1,65). Bulan dengan n kecil otomatis tanpa koreksi, sehingga proyeksinya sama dengan baseline.</p>
       </section>
 
       <section class="box">
@@ -172,43 +243,59 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
         <div class="status"><span class="badge" id="pbg">memuat…</span><span id="psl"></span><button id="rf" type="button">↻ Ambil ulang</button></div>
         <p class="note" id="psm"></p>
         <div class="es" id="es"></div>
-        <p class="note">OBS = observasi bulanan, MTD = rerata mingguan bulan berjalan, FCST = prakiraan dari spreadsheet, STAT = estimasi statistik, PROY = persistensi anomali terakhir yang meluruh menuju nol (e-fold 6 bulan) bila prakiraan tidak tersedia. PROY bukan prakiraan resmi NOAA.</p>
       </section>
 
       <section class="box">
         <h2 id="jp2">Grafik proyeksi 12 bulan ke depan</h2>
         <div id="pc" role="img" aria-label="Grafik proyeksi curah hujan 12 bulan ke depan"></div>
         <div class="leg">
-          <span><i style="background:var(--mut);opacity:.35"></i>Baseline (rerata historis)</span>
-          <span><i style="background:var(--c1)"></i>Proyeksi Bawah Normal</span>
-          <span><i style="background:var(--mut)"></i>Proyeksi Normal</span>
-          <span><i style="background:var(--c2)"></i>Proyeksi Atas Normal</span>
+          <span><i style="background:var(--mut);opacity:.35"></i>Baseline</span>
+          <span><i style="background:var(--c1)"></i>Bawah Normal</span>
+          <span><i style="background:var(--mut)"></i>Normal</span>
+          <span><i style="background:var(--c2)"></i>Atas Normal</span>
         </div>
       </section>
 
       <section class="box">
-        <h2 id="jp3">Total per bulan dan peluang kategori</h2>
-        <div class="tw"><table>
+        <h2 id="jp3">
+            <span>Total per bulan & Kalender Tanam</span>
+            <input type="number" id="th-filter" placeholder="Sorot > X mm" title="Ketik ambang curah hujan untuk menyorot bulan ekstrem">
+        </h2>
+        <div class="tw"><table id="tbl-proyeksi">
           <thead><tr><th>Bulan</th><th>Baseline</th><th>Proyeksi</th><th>P10–P90</th><th>%</th><th>Niño-3.4</th><th>Faktor F</th><th>n / t</th><th>Peluang BN / N / AN</th><th>Kategori</th></tr></thead>
           <tbody id="tpm"></tbody><tfoot id="tpf"></tfoot>
         </table></div>
+        
+        <!-- Kalender Tanam / Agroklimat Timeline -->
+        <h4 style="margin: 15px 0 5px 0;">Analisis Indikasi Hidrologis (12 Bulan)</h4>
+        <div id="agri-cal" class="agri-timeline"></div>
+        <div class="leg" style="margin-bottom:15px;">
+            <span><i style="background:var(--kritis)"></i>< 100mm (Kritis/Bera)</span>
+            <span><i style="background:var(--menengah)"></i>100-200mm (Menengah/Vegetatif)</span>
+            <span><i style="background:var(--aman)"></i>> 200mm (Basah/Pengolahan)</span>
+        </div>
+
+        <div style="text-align: right; margin-top: 10px;">
+            <button onclick="unduhCSV('tbl-proyeksi', 'Proyeksi_Hujan.csv')">📥 Unduh Data CSV</button>
+        </div>
         <p class="note" id="pnt"></p>
       </section>
     </div>
   </div>
 </div>
 
+<!-- Floating Tooltip Container -->
+<div id="tooltip" class="glass-tooltip"></div>
+
 <script>
-// URL web app Apps Script (berakhiran /exec). Butuh aksi ch_bulanan (Kabupaten.gs) dan oni
+// URL web app Apps Script
 const API_URL = 'https://script.google.com/macros/s/AKfycbzHmd64Bj2JEFTJG4ufKJcMeutW-6f0XJE7vB5skyCIxaCZbTEqaKbWth0nduKAyoDS/exec';
-// Proyeksi memakai Niño-3.4 bulanan dari jembatan Apps Script (seri NOAA + MTD + Sheet prakiraan + analog), cadangan NOAA CPC langsung.
-// Tab riwayat memakai ONI dari spreadsheet (aksi=oni), cadangan NOAA oni.ascii.txt.
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
 const NOAA_RN = 'https://www.cpc.ncep.noaa.gov/data/indices/Rnino34.ascii.txt';
 
-const KAB = [{ id: 'bone', nm: 'Bone' }, { id: 'soppeng', nm: 'Soppeng' }, { id: 'sidrap', nm: 'Sidrap' }, { id: 'wajo', nm: 'Wajo' }];
+const KAB = [{ id: 'bone', nm: 'Bone', lat: -4.8, lng: 120.12 }, { id: 'soppeng', nm: 'Soppeng', lat: -4.35, lng: 119.88 }, { id: 'sidrap', nm: 'Sidrap', lat: -3.93, lng: 119.85 }, { id: 'wajo', nm: 'Wajo', lat: -4.09, lng: 120.16 }];
 const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => n == null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -218,6 +305,7 @@ const kls = v => v >= .5 ? 'fe' : v <= -.5 ? 'fl' : 'fn';
 const valid = r => r.pos_rata == null || r.pos_rata > 0;
 const kuat = r => Math.abs(r) >= .5 ? 'kuat' : Math.abs(r) >= .3 ? 'sedang' : 'lemah';
 let ONI = {}, A = {}, RAW = {}, kab = 'wajo', tahun = null, mode = 'kab', hid = {}, PM = [];
+let leafletMap = null; // Global Map instance
 const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; };
 const S = () => A[kab];
 const nmKab = () => KAB.filter(k => k.id === kab)[0].nm;
@@ -229,21 +317,135 @@ function daftarTahun() {
   return Object.keys(s).map(Number).sort((a, b) => b - a);
 }
 
-function ukur(id) {
-  const W = Math.max(300, Math.round($(id).clientWidth || 720));
-  return { W: W, kecil: W < 520, fb: W < 360 ? 12 : W < 520 ? 13 : 14, fa: W < 520 ? 11 : 12 };   // fb = font bulan, fa = font angka
+// ---------------- Tooltip & Exports Utilities ----------------
+const tt = $('tooltip');
+document.addEventListener('mouseover', e => {
+  if(e.target && e.target.hasAttribute('data-tip')) {
+    tt.innerHTML = e.target.getAttribute('data-tip');
+    tt.classList.add('show');
+  }
+});
+document.addEventListener('mousemove', e => {
+  if (tt.classList.contains('show')) {
+    // Offset slightly above the cursor
+    tt.style.left = e.clientX + 'px';
+    tt.style.top = (e.clientY - 15) + 'px';
+  }
+});
+document.addEventListener('mouseout', e => {
+  if (e.target && e.target.hasAttribute('data-tip')) tt.classList.remove('show');
+});
+
+/* ================= DATA TERSTRUKTUR → CSV & PDF ================= */
+function dsRiwayat() {
+  const s = S(), rows = s.years[tahun] || Array(12).fill(null); let tot = 0, hr = 0;
+  const cols = [{h:'Bulan'},{h:'Total (mm)',d:1},{h:'Rata-rata/hari (mm)',d:2},{h:'Hari data',d:0},{h:'Hari dalam bulan',d:0},{h:'Pos aktif',d:1},{h:'Rata-rata bulan ini (mm)',d:0},{h:'% dari rata-rata',d:0},{h:'ONI',d:1},{h:'Fase ENSO'},{h:'Status data'}];
+  const data = BLN.map((b, i) => {
+    const r = rows[i], o = oniOf(tahun, i);
+    if (!r) return [b, null, null, null, null, null, s.base[i], null, o, fase(o), 'Tidak ada data'];
+    tot += r.mm; hr += r.hari;
+    return [b, r.mm, r.hari ? r.mm / r.hari : null, r.hari, r.hari_bulan, r.pos_rata, s.base[i], s.base[i] ? r.mm / s.base[i] * 100 : null, o, fase(o), r.lengkap ? 'Lengkap' : 'Belum lengkap'];
+  });
+  return { nama: 'Riwayat_Hujan_' + nmKab() + '_' + tahun, judul: 'Riwayat Curah Hujan Kabupaten ' + nmKab() + ' · ' + tahun, cols, rows: data,
+    foot: ['Total ' + tahun, tot, hr ? tot / hr : null, hr, null, null, null, null, null, '', ''], catatan: 'Total tahun dihitung dari seluruh bulan yang datanya tersedia, termasuk bulan yang belum lengkap.' };
+}
+function dsBanding() {
+  const cols = [{h:'Bulan'}].concat(KAB.map(k => ({h: k.nm + ' (mm)', d: 1}))), tot = KAB.map(() => 0), kurang = [];
+  const rows = BLN.map((b, i) => [b].concat(KAB.map((k, j) => {
+    const r = rowsOf(k.id, tahun)[i]; if (!r) return null; tot[j] += r.mm; if (!r.lengkap) kurang.push(k.nm + ' ' + b.slice(0, 3)); return r.mm; })));
+  return { nama: 'Banding_Hujan_' + tahun, judul: 'Perbandingan Curah Hujan Kabupaten · ' + tahun, cols, rows, foot: ['Total ' + tahun].concat(tot),
+    catatan: kurang.length ? 'Data belum lengkap: ' + kurang.join(', ') + '.' : '' };
+}
+function dsProyeksi() {
+  const cols = [{h:'Bulan'},{h:'Baseline (mm)',d:0},{h:'Proyeksi (mm)',d:0},{h:'P10 (mm)',d:0},{h:'P90 (mm)',d:0},{h:'% normal',d:0},{h:'Niño-3.4',d:1},{h:'Faktor F',d:2},{h:'Peluang BN (%)',d:0},{h:'Peluang N (%)',d:0},{h:'Peluang AN (%)',d:0},{h:'Kategori'}];
+  let tb = 0, tp = 0;
+  const rows = PM.map(x => {
+    if (x.none) return [bl(x.m), null, null, null, null, null, x.e, null, null, null, null, 'Data historis belum cukup'];
+    tb += x.Nm; tp += x.mean;
+    return [bl(x.m), x.Nm, x.mean, x.p10, x.p90, x.mean / x.Nm * 100, x.e, x.F, x.pb * 100, x.pn * 100, x.pa * 100, CN[x.cat]];
+  });
+  return { nama: 'Proyeksi_Hujan_' + nmKab(), judul: 'Proyeksi Curah Hujan 12 Bulan · Kabupaten ' + nmKab(), cols, rows,
+    foot: ['Total', tb, tp, null, null, tb ? tp / tb * 100 : null, null, null, null, null, null, ''],
+    catatan: 'Sumber ENSO: ' + ENS.name + '. BN = bawah normal, N = normal, AN = atas normal. P10–P90 = rentang ketidakpastian.' };
+}
+const dataset = () => mode === 'semua' ? dsBanding() : mode === 'proy' ? dsProyeksi() : dsRiwayat();
+
+function simpan(blob, nama) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nama;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+/* CSV: pemisah ";" dan desimal koma agar langsung rapi di Excel Indonesia; BOM agar "Niño" tidak rusak */
+function unduhCSV() {
+  const d = dataset(), q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const cell = v => v == null || v === '' ? '' : typeof v === 'number' ? (isFinite(v) ? String(Math.round(v * 100) / 100).replace('.', ',') : '') : q(v);
+  const lines = [d.cols.map(c => q(c.h)).join(';')].concat(d.rows.map(r => r.map(cell).join(';')));
+  if (d.foot) lines.push(d.foot.map(cell).join(';'));
+  simpan(new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), d.nama + '.csv');
 }
 
+/* PDF: laporan khusus (tema terang, tanpa tombol), bukan screenshot halaman */
+function tabelHtml(d) {
+ const f = (v, c) => v == null || v === '' ? (v === '' ? '' : '–') : typeof v === 'number' ? fmt(v, c.d == null ? 1 : c.d) : v;
+  const td = (v, i) => `<td${typeof v === 'string' && i > 0 ? ' class="t"' : ''}>${f(v, d.cols[i])}</td>`;
+  return `<table><thead><tr>${d.cols.map(c => `<th>${c.h}</th>`).join('')}</tr></thead><tbody>${d.rows.map(r => `<tr>${r.map(td).join('')}</tr>`).join('')}</tbody>` +
+    (d.foot ? `<tfoot><tr>${d.foot.map(td).join('')}</tr></tfoot>` : '') + '</table>';
+}
+function blokPetaPDF() {
+  const S_ = titikSebaran(); if (!S_) return '';
+  const pos = p => `left:${(p.lng - B.w) / (B.e - B.w) * 100}%;top:${(B.n - p.lat) / (B.n - B.s) * 100}%`;
+  const urut = S_.pts.slice().sort((a, b) => b.v - a.v);
+  return `<div class="pdf-keep"><h3>Ilustrasi sebaran curah hujan ${tahun}</h3><div class="pdf-peta"><div class="pdf-map"><img src="${citraSebaran(S_)}">` +
+    S_.pts.map(p => `<i class="pdf-dot" style="${pos(p)}"></i><span class="pdf-lbl" style="${pos(p)}">${p.nm}<br>${fmt(p.v, 0)} mm</span>`).join('') +
+    `</div><div class="pdf-side"><table><thead><tr><th>Peringkat</th><th>Kabupaten</th><th>Total (mm)</th></tr></thead><tbody>` +
+    urut.map((p, i) => `<tr><td>${i + 1}</td><td class="t">${p.nm}</td><td>${fmt(p.v, 1)}</td></tr>`).join('') + `</tbody></table>${legendHtml(S_)}</div></div></div>`;
+}
+function blokPDF() {
+  if (mode === 'semua') {
+    const WR = ['#1f77a6', '#d9822b', '#1e9e7e', '#7a5bd0'];
+    const lg = KAB.map((k, j) => hid[k.id] ? '' : `<span style="color:${WR[j]}">●</span> ${k.nm}`).join(' &nbsp; ');
+    return `<div class="pdf-keep"><h3>Perbandingan curah hujan bulanan (mm)</h3>${$('cmp').innerHTML}<p class="pdf-leg">${lg} · titik berongga = bulan belum lengkap</p></div>` + blokPetaPDF();
+  }
+  if (mode === 'proy') {
+    const lb = PM.filter(c => !c.none).map(c => `<span style="flex:1;text-align:center">${BLN[c.m.mo - 1].slice(0, 3)}</span>`).join('');
+    return `<div class="pdf-keep"><h3>Proyeksi 12 bulan ke depan (mm)</h3>${$('pc').innerHTML}<p class="pdf-leg">Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90</p></div>` +
+      `<div class="pdf-keep"><h3>Indikasi hidrologis 12 bulan</h3>${$('agri-cal').outerHTML}<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div><p class="pdf-leg">Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)</p></div>`;
+  }
+  return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata semua tahun · batang pudar = data belum lengkap</p></div>` +
+    `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`;
+}
+function unduhPDF() {
+  if (typeof html2pdf === 'undefined') { alert('Pustaka PDF belum termuat, coba lagi sebentar.'); return; }
+  const d = dataset(), tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const el = document.createElement('div'); el.className = 'pdf-report';
+  el.innerHTML = `<h1>${d.judul}</h1><p class="pdf-sub">Telemetri BBWS Pompengan Jeneberang · dicetak ${tgl}</p>` + blokPDF() +
+    '<h3>Rincian data</h3>' + tabelHtml(d) + (d.catatan ? `<p class="pdf-leg">${d.catatan}</p>` : '');
+  html2pdf().set({ margin: [10, 10, 12, 10], filename: d.nama + '.pdf', image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#fff', windowWidth: 1100 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-keep', 'tr'] } }).from(el).save();
+}
+$('th-filter').addEventListener('input', function (e) {
+  const val = parseFloat(e.target.value);
+  document.querySelectorAll('#tpm tr').forEach(tr => {
+    const c = tr.children[2]; if (!c) return;
+    const mm = parseFloat(c.innerText.replace(/\./g, '').replace(',', '.'));
+    tr.classList.toggle('highlight-row', !isNaN(val) && !isNaN(mm) && mm > val);
+  });
+});
+// -------------------------------------------------------------
+
+function ukur(id) {
+  const W = Math.max(300, Math.round($(id).clientWidth || 720));
+  return { W: W, kecil: W < 520, fb: W < 360 ? 12 : W < 520 ? 13 : 14, fa: W < 520 ? 11 : 12 };
+}
 function pearson(p) {
-  const n = p.length;
-  if (n < 8) return null;
+  const n = p.length; if (n < 8) return null;
   const mx = p.reduce((s, a) => s + a[0], 0) / n, my = p.reduce((s, a) => s + a[1], 0) / n;
   let sxy = 0, sxx = 0, syy = 0;
   p.forEach(a => { sxy += (a[0] - mx) * (a[1] - my); sxx += (a[0] - mx) ** 2; syy += (a[1] - my) ** 2; });
   return sxx && syy ? { r: sxy / Math.sqrt(sxx * syy), n } : null;
 }
 
-/* ================= MESIN PROYEKSI (GLM log-link + ENSO lag + Gamma) ================= */
+/* ================= MESIN PROYEKSI ================= */
 const MIN_N = 8, SHRINK = 8, TAU = 6, E_LO = -2, E_HI = 2.5, F_LO = .3, F_HI = 2.5, T_MIN = 1.65, ATT = .35, CK = 'ch_ens_v2';
 const now = new Date(), NOWZ = now.getFullYear() * 12 + now.getMonth(), REPORT_YEAR = now.getFullYear();
 const mk = z => ({ y: Math.floor(z / 12), mo: z % 12 + 1 });
@@ -277,11 +479,7 @@ function fitPairs(P, m0) {
   const phi = P.reduce((s, p) => { const m = Math.exp(a + b * p.x); return s + (p.y - m) ** 2 / m; }, 0) / Math.max(1, n - 2);
   const se = Math.sqrt(phi * s0 / Math.max(1e-9, s0 * s2 - s1 * s1)), t = se > 0 ? b / se : 0;
   R.t = t;
-  if (Math.abs(t) >= T_MIN) {
-    b = b * n / (n + SHRINK);
-    a = Math.log(P.reduce((s, p) => s + p.y, 0) / P.reduce((s, p) => s + Math.exp(b * p.x), 0));
-    R.a = a; R.b = b; R.ok = true;
-  }
+  if (Math.abs(t) >= T_MIN) { b = b * n / (n + SHRINK); a = Math.log(P.reduce((s, p) => s + p.y, 0) / P.reduce((s, p) => s + Math.exp(b * p.x), 0)); R.a = a; R.b = b; R.ok = true; }
   const sd = Math.sqrt(P.reduce((s, p) => s + (p.y - Math.exp(R.a + R.b * p.x)) ** 2, 0) / Math.max(1, n - (R.ok ? 2 : 1)));
   R.cv = Math.min(1.5, Math.max(.2, sd / R.mean));
   return R;
@@ -326,7 +524,7 @@ function compute(id, list, ev) {
     return { m: m, e: e, F: p.F, n: f.n, t: f.t, fitOK: f.ok, Nm: Nm, mean: p.mu, p10: ds.p10, p90: ds.p90, pb: pb, pn: pn, pa: pa, cat: cat };
   });
 }
-function tahunan(id) {   // total tahun kalender: bulan lengkap = aktual, sisanya = model
+function tahunan(id) {
   const ms = compute(id, CAL, ensoAutoFor(CAL).map(r => r.v)), rows = rowsOf(id, REPORT_YEAR);
   let tb = 0, tp = 0, nO = 0, n = 0;
   ms.forEach((c, i) => {
@@ -337,7 +535,7 @@ function tahunan(id) {   // total tahun kalender: bulan lengkap = aktual, sisany
   return { tb: tb, tp: tp, nO: nO, n: n };
 }
 
-/* ================= SUMBER ENSO ================= */
+/* ================= FETCH DATA & SETUP ================= */
 async function ft(u, ms = 12000) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(u, { cache: 'no-store', signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); }
@@ -346,37 +544,28 @@ async function ft(u, ms = 12000) {
 const NUM = s => s !== '' && !isNaN(+s);
 const toObs = d => { const o = {}; Object.keys(d).forEach(y => (d[y] || []).forEach((v, m) => { if (v != null && isFinite(v)) o[y + '-' + (m + 1)] = +v; })); return o; };
 const pBr = t => { const j = JSON.parse(t); if (!j.ok) throw new Error('jembatan gagal'); return { obs: j.series || {}, fcst: j.forecast || {}, mtd: j.mtd || {}, fauto: j.forecastAuto || {}, kind: j.kind, fstat: j.forecastStatus, name: 'Apps Script jembatan · ' + (j.source || 'NOAA CPC') }; };
-const pSst = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length >= 10 && p.slice(0, 10).every(NUM)) { const y = +p[0], m = +p[1], v = +p[9]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'OISST', name: 'NOAA CPC · sstoi.indices (Niño-3.4 OISST)' }; };
-const pRn = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length === 3 && p.every(NUM)) { const y = +p[0], m = +p[1], v = +p[2]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'RONI', name: 'NOAA CPC · Rnino34.ascii.txt (RONI)' }; };
+const pSst = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length >= 10 && p.slice(0, 10).every(NUM)) { const y = +p[0], m = +p[1], v = +p[9]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'OISST', name: 'NOAA CPC · sstoi.indices' }; };
+const pRn = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length === 3 && p.every(NUM)) { const y = +p[0], m = +p[1], v = +p[2]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'RONI', name: 'NOAA CPC · Rnino34.ascii.txt' }; };
 const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND','NDJ'];
 const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/), i = SEAS.indexOf(p[0]); if (p.length >= 4 && i > -1 && isFinite(p[1]) && isFinite(p[3])) o[+p[1] + '-' + (i + 1)] = +p[3]; }); return { obs: o, name: 'NOAA CPC · oni.ascii.txt' }; };
 
-// Proyeksi: jembatan Apps Script → NOAA sstoi → NOAA Rnino34 → cache. Prioritas nilai per bulan: OBS → MTD → Sheet (FCST) → analog (STAT) → PROY.
 async function ensoPilih() {
   const err = [], nm = ['jembatan Apps Script', 'NOAA sstoi', 'NOAA Rnino34'];
   const src = [async () => pBr(await ft(BRIDGE_URL)), async () => pSst(await ft(NOAA_SST)), async () => pRn(await ft(NOAA_RN))];
   for (let i = 0; i < src.length; i++) {
-    try {
-      const d = await src[i]();
-      if (d && Object.keys(d.obs).length) { ENS = Object.assign(d, { mode: 'live', at: new Date(), err: err }); try { localStorage.setItem(CK, JSON.stringify(ENS)); } catch (e) { /* abaikan */ } return; }
-      err.push(nm[i] + ': kosong');
-    } catch (e) { err.push(nm[i] + ': ' + (e.name === 'AbortError' ? 'timeout' : e.message)); }
+    try { const d = await src[i](); if (d && Object.keys(d.obs).length) { ENS = Object.assign(d, { mode: 'live', at: new Date(), err: err }); try { localStorage.setItem(CK, JSON.stringify(ENS)); } catch (e) {} return; } err.push(nm[i] + ': kosong'); } catch (e) { err.push(nm[i] + ': ' + (e.name === 'AbortError' ? 'timeout' : e.message)); }
   }
-  try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.obs) { ENS = Object.assign(c, { mode: 'cache', at: new Date(c.at), err: err }); return; } } catch (e) { /* abaikan */ }
+  try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.obs) { ENS = Object.assign(c, { mode: 'cache', at: new Date(c.at), err: err }); return; } } catch (e) {}
   ENS = { obs: {}, fcst: {}, mtd: {}, fauto: {}, name: 'Tanpa data ENSO (dianggap netral)', mode: 'none', at: null, err: err };
 }
-// Riwayat: ONI dari spreadsheet (aksi=oni), cadangan NOAA oni.ascii.txt
 async function oniLoad() {
   let d = null;
-  try {
-    const r = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni');
-    const o = r.ok ? await r.json() : null;
-    if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Spreadsheet (Apps Script)' };
-  } catch (e) { /* lanjut ke NOAA */ }
-  if (!d) { try { const x = pOni(await ft(NOAA_ONI)); if (Object.keys(x.obs).length) d = x; } catch (e) { /* abaikan */ } }
+  try { const r = await fetch(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni'); const o = r.ok ? await r.json() : null; if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Spreadsheet (Apps Script)' }; } catch (e) {}
+  if (!d) { try { const x = pOni(await ft(NOAA_ONI)); if (Object.keys(x.obs).length) d = x; } catch (e) {} }
   ONI = {}; let la = 0;
   if (d) Object.keys(d.obs).forEach(k => { const p = k.split('-').map(Number); (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k]; la = Math.max(la, p[0] * 12 + p[1] - 1); });
-  $('ons').textContent = la ? BLN[la % 12] + ' ' + Math.floor(la / 12) + ' (' + d.name + ')' : 'tidak tersedia';
+  const elOns = $('ons');
+if (elOns) elOns.textContent = la ? BLN[la % 12] + ' ' + Math.floor(la / 12) + ' (' + d.name + ')' : 'tidak tersedia';
 }
 async function ambilEnso() { await Promise.all([ensoPilih(), oniLoad()]); }
 
@@ -384,11 +573,7 @@ function proses(data) {
   A = {};
   KAB.forEach(k => {
     const list = data[k.id] || [], years = {}, acc = Array.from({ length: 12 }, () => []);
-    list.forEach(r => {
-      const y = +r.bulan.slice(0, 4), m = +r.bulan.slice(5, 7) - 1;
-      (years[y] = years[y] || Array(12).fill(null))[m] = r;
-      if (r.lengkap && valid(r)) acc[m].push(r.mm);
-    });
+    list.forEach(r => { const y = +r.bulan.slice(0, 4), m = +r.bulan.slice(5, 7) - 1; (years[y] = years[y] || Array(12).fill(null))[m] = r; if (r.lengkap && valid(r)) acc[m].push(r.mm); });
     const base = acc.map(a => a.length >= 3 ? a.reduce((s, x) => s + x, 0) / a.length : null);
     const all = [], jn = [], ye = [], ks = Object.keys(years).map(Number), satu = [];
     list.forEach(r => {
@@ -397,25 +582,16 @@ function proses(data) {
       const p = [o, Math.max(-100, Math.min(200, (r.mm / base[m] - 1) * 100))];
       all.push(p); if (m >= 6 && m <= 10) jn.push(p);
     });
-    ks.forEach(y => {
-      const ok = years[y].filter(r => r && r.lengkap && valid(r)), ada = years[y].filter(Boolean);
-      if (ok.length >= 11) ye.push({ y: y, mm: ok.reduce((s, r) => s + r.mm, 0) });
-      if (ada.reduce((s, r) => s + (r.pos_rata || 0), 0) / ada.length <= 1.2) satu.push(y);
-    });
+    ks.forEach(y => { const ok = years[y].filter(r => r && r.lengkap && valid(r)), ada = years[y].filter(Boolean); if (ok.length >= 11) ye.push({ y: y, mm: ok.reduce((s, r) => s + r.mm, 0) }); if (ada.reduce((s, r) => s + (r.pos_rata || 0), 0) / ada.length <= 1.2) satu.push(y); });
     ye.sort((a, b) => b.mm - a.mm);
-    // data latih proyeksi: bulan lengkap, pos aktif, bukan bulan berjalan; nol hanya dipercaya di Jul–Nov
-    const rain = list.filter(r => r.lengkap && valid(r) && r.mm >= 0).map(r => ({ y: +r.bulan.slice(0, 4), mo: +r.bulan.slice(5, 7), mm: r.mm }))
-      .filter(t => t.y * 12 + t.mo - 1 < NOWZ && (t.mm > 0 || (t.mo >= 7 && t.mo <= 11)));
-    A[k.id] = { years: years, base: base, korel: { all: pearson(all), jn: pearson(jn) }, basah: ye[0] || null, kering: ye[ye.length - 1] || null,
-      y0: ks.length ? Math.min.apply(null, ks) : null, satuPos: satu.length ? Math.max.apply(null, satu) : null, rain: rain, fit: {} };
+    const rain = list.filter(r => r.lengkap && valid(r) && r.mm >= 0).map(r => ({ y: +r.bulan.slice(0, 4), mo: +r.bulan.slice(5, 7), mm: r.mm })).filter(t => t.y * 12 + t.mo - 1 < NOWZ && (t.mm > 0 || (t.mo >= 7 && t.mo <= 11)));
+    A[k.id] = { years: years, base: base, korel: { all: pearson(all), jn: pearson(jn) }, basah: ye[0] || null, kering: ye[ye.length - 1] || null, y0: ks.length ? Math.min.apply(null, ks) : null, satuPos: satu.length ? Math.max.apply(null, satu) : null, rain: rain, fit: {} };
   });
 }
 
-function langkah(max) {
-  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
-}
+function langkah(max) { const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
 
+/* ================= RENDERING ================= */
 function gambar(rows) {
   const base = S().base, u = ukur('chart'), W = u.W, H = u.kecil ? 290 : 320, fb = u.fb, fa = u.fa;
   const m = { l: u.kecil ? 38 : 48, r: 6, t: 20, b: 38 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
@@ -424,22 +600,19 @@ function gambar(rows) {
   const Y = v => m.t + ph - v / top * ph, cw = pw / 12, bw = cw * 0.62;
   let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
   for (let v = 0; v <= top + 1e-9; v += st)
-    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--line)"/>' +
-         '<text x="' + (m.l - 5) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="' + fa + '" fill="var(--mut)">' + fmt(v, 0) + '</text>';
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
   rows.forEach((r, i) => {
     const cx = m.l + cw * (i + .5);
-    s += '<text x="' + cx + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fb + '" font-weight="600" fill="var(--ink)">' + BLN[i].slice(0, 3) + '</text>';
+    s += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
     if (!r) return;
     const h = Math.max(1.5, r.mm / top * ph);
-    s += '<g><title>' + BLN[i] + ': ' + fmt(r.mm) + ' mm' + (r.lengkap ? '' : ' (data ' + r.hari + '/' + r.hari_bulan + ' hari)') + '</title>' +
-         '<rect x="' + (cx - bw / 2) + '" y="' + (Y(0) - h) + '" width="' + bw + '" height="' + h + '" rx="3" fill="var(--bar)"' +
-         (r.lengkap ? '' : ' opacity=".4" stroke="var(--bar)" stroke-dasharray="3 2"') + '/></g>';
-    if (h > 14 || r.mm > 0) s += '<text x="' + cx + '" y="' + (Y(0) - h - 4) + '" text-anchor="middle" font-size="' + fa + '" font-weight="700" fill="var(--ink)">' + fmt(r.mm, 0) + '</text>';
+    const tip = `${BLN[i]}: ${fmt(r.mm)} mm ${r.lengkap ? '' : '(data '+r.hari+'/'+r.hari_bulan+' hari)'}`;
+    s += `<rect x="${cx - bw / 2}" y="${Y(0) - h}" width="${bw}" height="${h}" rx="3" fill="var(--bar)" data-tip="${tip}" ${r.lengkap ? '' : 'opacity=".4" stroke="var(--bar)" stroke-dasharray="3 2"'}/>`;
+    if (h > 14 || r.mm > 0) s += `<text x="${cx}" y="${Y(0) - h - 4}" text-anchor="middle" font-size="${fa}" font-weight="700" fill="var(--ink)">${fmt(r.mm, 0)}</text>`;
   });
-  let d = '';
-  base.forEach((b, i) => { if (b != null) d += (d ? 'L' : 'M') + (m.l + cw * (i + .5)) + ',' + Y(b); });
-  s += '<path d="' + d + '" fill="none" stroke="var(--base)" stroke-width="2.4" stroke-linejoin="round"/>';
-  base.forEach((b, i) => { if (b != null) s += '<circle cx="' + (m.l + cw * (i + .5)) + '" cy="' + Y(b) + '" r="3.5" fill="var(--base)"/>'; });
+  let d = ''; base.forEach((b, i) => { if (b != null) d += (d ? 'L' : 'M') + (m.l + cw * (i + .5)) + ',' + Y(b); });
+  s += `<path d="${d}" fill="none" stroke="var(--base)" stroke-width="2.4" stroke-linejoin="round"/>`;
+  base.forEach((b, i) => { if (b != null) s += `<circle cx="${m.l + cw * (i + .5)}" cy="${Y(b)}" r="3.5" fill="var(--base)" data-tip="Baseline ${BLN[i]}: ${fmt(b,0)} mm"/>`; });
   $('chart').innerHTML = s + '</svg>';
 }
 
@@ -450,134 +623,172 @@ function gambarEnso() {
   const top = Math.max(2, Math.ceil(Math.max(...v.map(x => Math.abs(x || 0))) * 2) / 2);
   const Y = x => m.t + ph / 2 - x / top * (ph / 2), y0 = Y(0);
   let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
-  [top, 0, -top].forEach(t => {
-    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="' + (t ? 'var(--line)' : 'var(--mut)') + '"/>' +
-         '<text x="' + (m.l - 5) + '" y="' + (Y(t) + 4) + '" text-anchor="end" font-size="' + fa + '" fill="var(--mut)">' + sg(t) + '</text>';
-  });
+  [top, 0, -top].forEach(t => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t ? 'var(--line)' : 'var(--mut)'}"/><text x="${m.l - 5}" y="${Y(t) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${sg(t)}</text>`; });
   v.forEach((x, i) => {
     const cx = m.l + cw * (i + .5);
-    s += '<text x="' + cx + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fb + '" font-weight="600" fill="var(--ink)">' + BLN[i].slice(0, 3) + '</text>';
+    s += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
     if (x == null) return;
     const h = Math.max(1.5, Math.abs(Y(x) - y0)), pos = x >= 0;
     const fill = x >= .5 ? 'var(--warm)' : x <= -.5 ? 'var(--cool)' : 'var(--mut)';
-    s += '<g><title>' + BLN[i] + ': ONI ' + sg(x) + ' (' + fase(x) + ')</title><rect x="' + (cx - bw / 2) + '" y="' + (pos ? y0 - h : y0) +
-         '" width="' + bw + '" height="' + h + '" rx="2" fill="' + fill + '"' + (Math.abs(x) < .5 ? ' opacity=".5"' : '') + '/></g>' +
-         '<text x="' + cx + '" y="' + (pos ? y0 - h - 4 : y0 + h + fa + 2) + '" text-anchor="middle" font-size="' + fa + '" font-weight="700" fill="var(--ink)">' + sg(x) + '</text>';
+    s += `<rect x="${cx - bw / 2}" y="${pos ? y0 - h : y0}" width="${bw}" height="${h}" rx="2" fill="${fill}" data-tip="${BLN[i]}: ONI ${sg(x)} (${fase(x)})" ${Math.abs(x) < .5 ? 'opacity=".5"' : ''}/>` +
+         `<text x="${cx}" y="${pos ? y0 - h - 4 : y0 + h + fa + 2}" text-anchor="middle" font-size="${fa}" font-weight="700" fill="var(--ink)">${sg(x)}</text>`;
   });
   $('enso').innerHTML = s + '</svg>';
 }
 
 function kartu(rows) {
   const s = S(), ada = rows.filter(Boolean), lk = ada.filter(r => r.lengkap), total = ada.reduce((a, r) => a + r.mm, 0);
-  let sm = 0, sb = 0;
-  rows.forEach((r, i) => { if (r && r.lengkap && s.base[i] != null) { sm += r.mm; sb += s.base[i]; } });
-  const vl = lk.filter(valid);
-  const basah = vl.reduce((a, r) => !a || r.mm > a.mm ? r : a, null), kering = vl.reduce((a, r) => !a || r.mm < a.mm ? r : a, null);
+  let sm = 0, sb = 0; rows.forEach((r, i) => { if (r && r.lengkap && s.base[i] != null) { sm += r.mm; sb += s.base[i]; } });
+  const vl = lk.filter(valid), basah = vl.reduce((a, r) => !a || r.mm > a.mm ? r : a, null), kering = vl.reduce((a, r) => !a || r.mm < a.mm ? r : a, null);
   const nm = r => r ? BLN[+r.bulan.slice(5, 7) - 1] : '–', pct = sb ? sm / sb * 100 : null;
   const ov = Array.from({ length: 12 }, (_, i) => oniOf(tahun, i)).filter(x => x != null);
   const ne = ov.filter(x => x >= .5).length, nl = ov.filter(x => x <= -.5).length, nn = ov.length - ne - nl;
   const dom = !ov.length ? null : ne > nl && ne > nn ? ['El Niño', 'fe'] : nl > ne && nl > nn ? ['La Niña', 'fl'] : ['Netral', 'fn'];
-  const k = s.korel.all, kj = s.korel.jn, tb = s.basah, tk = s.kering;
-  const c = (a, v, t) => '<div class="card"><div class="k">' + a + '</div><div class="v">' + v + '</div><div class="s">' + t + '</div></div>';
+  const kj = s.korel.jn, tb = s.basah, tk = s.kering;
+  const c = (a, v, t) => `<div class="card"><div class="k">${a}</div><div class="v">${v}</div><div class="s">${t}</div></div>`;
   $('cards').innerHTML =
-    c('Total ' + tahun, fmt(total, 0) + ' <small>mm</small>', lk.length + ' bulan lengkap dari ' + ada.length + ' bulan berdata') +
-    c('Dibanding rata-rata', pct != null ? fmt(pct, 0) + '<small>%</small>' : '–', pct != null ? 'khusus ' + lk.length + ' bulan lengkap' : 'belum ada bulan lengkap') +
-    c('Bulan terbasah tahun ini', nm(basah), basah ? fmt(basah.mm) + ' mm' : 'belum ada bulan lengkap') +
-    c('Bulan terkering tahun ini', nm(kering), kering ? fmt(kering.mm) + ' mm' : 'belum ada bulan lengkap') +
-    c('Tahun terbasah sejak ' + s.y0, tb ? tb.y : '–', tb ? fmt(tb.mm, 1) + ' mm (min. 11 bln data)' : 'belum ada tahun dengan 11 bulan data') +
-    c('Tahun terkering sejak ' + s.y0, tk ? tk.y : '–', tk ? fmt(tk.mm, 1) + ' mm (min. 11 bln data)' : 'belum ada tahun dengan 11 bulan data') +
-    c('ENSO ' + tahun, dom ? '<span class="' + dom[1] + '">' + dom[0] + '</span>' : '–', dom ? ne + ' bulan El Niño · ' + nl + ' La Niña · ' + nn + ' netral' : 'belum ada data ONI') +
-    c('Dampak ENSO (Jul–Nov)', kj ? fmt(kj.r, 2) + ' <small>' + kuat(kj.r) + '</small>' : '–',
-      kj ? 'Korelasi musim kemarau (' + kj.n + ' bln)' + (k ? ' · Semua tahun: ' + fmt(k.r, 2) : '') : 'data belum cukup');
-
-  let t = nmKab() + ' ' + tahun + ': total ' + fmt(total, 0) + ' mm' + (pct != null ? ', ' + fmt(pct, 0) + '% dari rata-rata (' + lk.length + ' bulan lengkap)' : '') + '.';
-  if (basah) t += ' Bulan terbasah ' + nm(basah) + ' (' + fmt(basah.mm) + ' mm), terkering ' + nm(kering) + ' (' + fmt(kering.mm) + ' mm).';
-  if (dom) t += ' ENSO tahun ini cenderung ' + dom[0] + '.';
-  if (kj) t += ' Pada musim kemarau (Jul–Nov) korelasinya ' + fmt(kj.r, 2) + ' (' + kuat(kj.r) + '): ' +
-    (kj.r <= -.3 ? 'El Niño cenderung disertai hujan di bawah normal.' : kj.r >= .3 ? 'El Niño cenderung disertai hujan di atas normal.' : 'hubungan ENSO–hujan lemah sehingga belum bisa diandalkan.');
-  $('ring').textContent = t;
+    c('Total ' + tahun, fmt(total, 0) + ' <small>mm</small>', lk.length + ' bln lengkap dari ' + ada.length) +
+    c('Dibanding rata-rata', pct != null ? fmt(pct, 0) + '<small>%</small>' : '–', pct != null ? 'khusus ' + lk.length + ' bln lengkap' : 'belum ada') +
+    c('Bulan terbasah', nm(basah), basah ? fmt(basah.mm) + ' mm' : 'belum ada') +
+    c('Bulan terkering', nm(kering), kering ? fmt(kering.mm) + ' mm' : 'belum ada') +
+    c('Tahun terbasah', tb ? tb.y : '–', tb ? fmt(tb.mm, 1) + ' mm' : '–') +
+    c('Tahun terkering', tk ? tk.y : '–', tk ? fmt(tk.mm, 1) + ' mm' : '–') +
+    c('ENSO ' + tahun, dom ? `<span class="${dom[1]}">${dom[0]}</span>` : '–', dom ? `${ne} El Niño · ${nl} La Niña` : 'belum ada data') +
+    c('Dampak ENSO', kj ? fmt(kj.r, 2) + ' <small>' + kuat(kj.r) + '</small>' : '–', kj ? 'Korelasi musim kemarau' : 'data belum cukup');
+  $('ring').textContent = `${nmKab()} ${tahun}: total ${fmt(total, 0)} mm. Bulan terbasah ${nm(basah)} (${basah ? fmt(basah.mm) : 0} mm). ENSO cenderung ${dom ? dom[0] : '-'}.`;
 }
 
 function tabel(rows) {
-  const s = S();
-  let tot = 0, hr = 0, parsial = false;
+  const s = S(); let tot = 0, hr = 0, parsial = false;
   $('tb').innerHTML = rows.map((r, i) => {
-    const o = oniOf(tahun, i), eh = o == null ? '<td class="na">–</td>' : '<td class="' + kls(o) + '">' + sg(o) + ' ' + fase(o) + '</td>';
-    if (!r) return '<tr><td>' + BLN[i] + '</td><td class="na" colspan="6">tidak ada data</td>' + eh + '</tr>';
+    const o = oniOf(tahun, i), eh = o == null ? '<td class="na">–</td>' : `<td class="${kls(o)}">${sg(o)} ${fase(o)}</td>`;
+    if (!r) return `<tr><td>${BLN[i]}</td><td class="na" colspan="6">tidak ada data</td>${eh}</tr>`;
     tot += r.mm; hr += r.hari;
     const pc = s.base[i] ? r.mm / s.base[i] * 100 : null, ps = r.lengkap ? '' : '*';
     if (!r.lengkap) parsial = true;
-    return '<tr><td>' + BLN[i] + '</td><td><b>' + fmt(r.mm) + ps + '</b></td><td>' + fmt(r.hari ? r.mm / r.hari : null, 2) + '</td><td>' +
-      r.hari + '/' + r.hari_bulan + '</td><td>' + fmt(r.pos_rata) + '</td><td>' + fmt(s.base[i], 0) + '</td><td class="pc">' + (pc == null ? '–' : fmt(pc, 0) + '%' + ps) + '</td>' + eh + '</tr>';
+    return `<tr><td>${BLN[i]}</td><td><b>${fmt(r.mm)}${ps}</b></td><td>${fmt(r.hari ? r.mm / r.hari : null, 2)}</td><td>${r.hari}/${r.hari_bulan}</td><td>${fmt(r.pos_rata)}</td><td>${fmt(s.base[i], 0)}</td><td class="pc">${pc == null ? '–' : fmt(pc, 0) + '%' + ps}</td>${eh}</tr>`;
   }).join('');
-  $('tf').innerHTML = '<tr><td>Total ' + tahun + '</td><td>' + fmt(tot) + '</td><td>' + fmt(hr ? tot / hr : null, 2) + '</td><td>' + hr + ' hari</td><td colspan="4"></td></tr>';
-  $('nt').textContent = (parsial ? '* Data bulan belum lengkap, sehingga totalnya lebih kecil dari bulan penuh dan persentasenya belum sebanding. ' : '') +
-    '“Rata-rata bulan ini” adalah rerata total bulan yang sama dari semua tahun (hanya bulan dengan data lengkap). Jumlah pos berubah antar tahun dan antar kabupaten, dan nilai 0 mm bisa berarti data kosong. Lihat kolom pos aktif. Label ENSO ditentukan dari ambang ONI ±0,5 per bulan.';
-  $('pn').textContent = s.satuPos ? ' Sampai tahun ' + s.satuPos + ', data ' + nmKab() + ' hanya dari 1 pos.' : '';
+  $('tf').innerHTML = `<tr><td>Total ${tahun}</td><td>${fmt(tot)}</td><td>${fmt(hr ? tot / hr : null, 2)}</td><td>${hr} hari</td><td colspan="4"></td></tr>`;
 }
 
-/* ---------- Tab bandingkan semua kabupaten ---------- */
+/* ---------- Tab Banding & Leaflet ---------- */
+/* ---------- Peta + ilustrasi sebaran (IDW) ---------- */
+const B = { s: -5.2, n: -3.6, w: 119.5, e: 120.5 };
+const SKALA = [[219,238,250],[158,202,225],[66,146,198],[33,113,181],[8,48,107]];
+let heatLayer = null, markerGrp = null, mapFit = false;
+function warna(t) {
+  t = Math.max(0, Math.min(1, t)); const x = t * (SKALA.length - 1), i = Math.min(SKALA.length - 2, Math.floor(x)), f = x - i, a = SKALA[i], b = SKALA[i + 1];
+  return a.map((v, k) => Math.round(v + (b[k] - v) * f));
+}
+function titikSebaran() {
+  const pts = KAB.map((k, j) => ({ ...k, v: rowsOf(k.id, tahun).filter(Boolean).reduce((a, r) => a + r.mm, 0) })).filter(p => !hid[p.id] && p.v > 0);
+  if (!pts.length) return null;
+  const vs = pts.map(p => p.v), lo = Math.min(...vs), hi = Math.max(...vs), pad = Math.max((hi - lo) * .15, hi * .05, 1);
+  return { pts, vmin: Math.max(0, lo - pad), vmax: hi + pad };
+}
+function citraSebaran(S_) {
+  const nx = 90, ny = Math.round(nx * (B.n - B.s) / (B.e - B.w)), cv = document.createElement('canvas');
+  cv.width = nx; cv.height = ny;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(nx, ny);
+  for (let j = 0; j < ny; j++) {
+    const lat = B.n - (j + .5) / ny * (B.n - B.s);
+    for (let i = 0; i < nx; i++) {
+      const lng = B.w + (i + .5) / nx * (B.e - B.w); let sw = 0, sv = 0, dm = 9;
+      S_.pts.forEach(p => { const dx = lng - p.lng, dy = lat - p.lat, d2 = dx * dx + dy * dy + 1e-5, w = 1 / d2; sw += w; sv += w * p.v; dm = Math.min(dm, Math.sqrt(d2)); });
+      const c = warna((sv / sw - S_.vmin) / (S_.vmax - S_.vmin)), o = (j * nx + i) * 4;
+      img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(190 * Math.exp(-((dm / .42) ** 2)));
+    }
+  }
+  ctx.putImageData(img, 0, 0); return cv.toDataURL();
+}
+function legendHtml(S_) {
+  const grad = SKALA.map(c => `rgb(${c})`).join(',');
+  return `<div class="mapleg"><span>${fmt(S_.vmin, 0)} mm</span><i style="background:linear-gradient(90deg,${grad})"></i><span>${fmt(S_.vmax, 0)} mm</span></div>` +
+    `<p class="note">Ilustrasi sebaran total hujan ${tahun} dari interpolasi IDW atas rata-rata ${S_.pts.length} kabupaten (titik = pusat kabupaten). Warna di antara titik adalah perkiraan, bukan hasil pengukuran, dan tidak mengikuti batas administrasi.</p>`;
+}
+function initMap() {
+  if (leafletMap !== null) return;
+  leafletMap = L.map('map').setView([-4.25, 120.0], 9);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(leafletMap);
+  markerGrp = L.layerGroup().addTo(leafletMap);
+}
+function updateMap() {
+  if (!leafletMap) initMap();
+  leafletMap.invalidateSize();
+  if (heatLayer) { leafletMap.removeLayer(heatLayer); heatLayer = null; }
+  markerGrp.clearLayers();
+  const S_ = titikSebaran();
+  if (!S_) { $('mapleg').innerHTML = '<p class="note">Belum ada data curah hujan untuk tahun ini.</p>'; return; }
+  heatLayer = L.imageOverlay(citraSebaran(S_), [[B.s, B.w], [B.n, B.e]], { interactive: false }).addTo(leafletMap);
+  S_.pts.forEach(p => L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: '#14211a', fillOpacity: 1, color: '#fff', weight: 2 })
+    .bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'top', offset: [0, -6], className: 'map-lbl' }).addTo(markerGrp));
+  if (!mapFit) { leafletMap.fitBounds(L.latLngBounds(S_.pts.map(p => [p.lat, p.lng])).pad(.6)); mapFit = true; }
+  $('mapleg').innerHTML = legendHtml(S_);
+}
+
 function kartuBanding() {
   $('cb').innerHTML = KAB.map((k, j) => {
-    const ada = rowsOf(k.id, tahun).filter(Boolean), lk = ada.filter(r => r.lengkap), tot = ada.reduce((a, r) => a + r.mm, 0);
-    const pos = ada.length ? Math.round(ada.reduce((a, r) => a + (r.pos_rata || 0), 0) / ada.length) : null;
-    return '<div class="card"><div class="k"><i class="dot" style="background:var(--c' + j + ')"></i>' + k.nm + ' ' + tahun + '</div>' +
-      '<div class="v" style="color:var(--c' + j + ')">' + (ada.length ? fmt(tot, 0) + ' <small>mm</small>' : '–') + '</div>' +
-      '<div class="s">' + (ada.length ? lk.length + ' bulan lengkap dari ' + ada.length + ' · rata-rata ' + pos + ' pos' : 'tidak ada data') + '</div></div>';
+    const ada = rowsOf(k.id, tahun).filter(Boolean), tot = ada.reduce((a, r) => a + r.mm, 0);
+    return `<div class="card"><div class="k"><i class="dot" style="background:var(--c${j})"></i>${k.nm} ${tahun}</div>` +
+      `<div class="v" style="color:var(--c${j})">${ada.length ? fmt(tot, 0) + ' <small>mm</small>' : '–'}</div></div>`;
   }).join('');
 }
-
 function chipBanding() {
-  $('chip').innerHTML = KAB.map((k, j) => '<button type="button" data-k="' + k.id + '" aria-pressed="' + !hid[k.id] + '"><i class="dot" style="background:var(--c' + j + ')"></i>' + k.nm + '</button>').join('');
+  $('chip').innerHTML = KAB.map((k, j) => `<button type="button" data-k="${k.id}" aria-pressed="${!hid[k.id]}"><i class="dot" style="background:var(--c${j})"></i>${k.nm}</button>`).join('');
 }
-
 function banding() {
   const u = ukur('cmp'), W = u.W, H = u.kecil ? 290 : 320, fb = u.fb, fa = u.fa;
-  const m = { l: u.kecil ? 38 : 48, r: 10, t: 16, b: 38 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12;
+  const m = { l: u.kecil ? 38 : 48, r: 10, t: 16, b: 38 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12, X = i => m.l + cw * (i + .5);
   const vis = KAB.map((k, j) => ({ k: k, j: j, rows: rowsOf(k.id, tahun) })).filter(o => !hid[o.k.id]);
   const maks = Math.max(10, ...vis.reduce((a, o) => a.concat(o.rows.map(r => r ? r.mm : 0)), []));
-  const st = langkah(maks * 1.05), top = Math.ceil(maks * 1.05 / st) * st, Y = v => m.t + ph - v / top * ph, X = i => m.l + cw * (i + .5);
-  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
-  for (let v = 0; v <= top + 1e-9; v += st)
-    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--line)"/>' +
-         '<text x="' + (m.l - 5) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="' + fa + '" fill="var(--mut)">' + fmt(v, 0) + '</text>';
-  for (let i = 0; i < 12; i++)
-    s += '<text x="' + X(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="' + fb + '" font-weight="600" fill="var(--ink)">' + BLN[i].slice(0, 3) + '</text>';
+  const st = langkah(maks * 1.05), top = Math.ceil(maks * 1.05 / st) * st, Y = v => m.t + ph - v / top * ph;
+  let s = `<svg viewBox="0 0 ${W} ${H}" font-family="system-ui,sans-serif">`;
+  for (let v = 0; v <= top + 1e-9; v += st) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
+  for (let i = 0; i < 12; i++) s += `<text x="${X(i)}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
   vis.forEach(o => {
-    const col = 'var(--c' + o.j + ')';
-    let d = '', prev = false;
+    const col = `var(--c${o.j})`; let d = '', prev = false;
     o.rows.forEach((r, i) => { if (r) { d += (prev ? 'L' : 'M') + X(i) + ',' + Y(r.mm); prev = true; } else prev = false; });
-    s += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.4" stroke-linejoin="round"/>';
-    o.rows.forEach((r, i) => {
-      if (!r) return;
-      s += '<circle cx="' + X(i) + '" cy="' + Y(r.mm) + '" r="4" fill="' + (r.lengkap ? col : 'var(--card)') + '" stroke="' + col + '" stroke-width="2"><title>' +
-        o.k.nm + ' · ' + BLN[i] + ': ' + fmt(r.mm) + ' mm' + (r.lengkap ? '' : ' (data ' + r.hari + '/' + r.hari_bulan + ' hari)') + '</title></circle>';
-    });
+    s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round"/>`;
+    o.rows.forEach((r, i) => { if (r) s += `<circle cx="${X(i)}" cy="${Y(r.mm)}" r="4" fill="${r.lengkap ? col : 'var(--card)'}" stroke="${col}" stroke-width="2" data-tip="${o.k.nm} · ${BLN[i]}: ${fmt(r.mm)} mm"></circle>`; });
   });
   $('cmp').innerHTML = s + '</svg>';
 }
-
 function tabelBanding() {
   const tot = KAB.map(() => 0);
-  let parsial = false;
-  $('hb').innerHTML = '<tr><th>Bulan</th>' + KAB.map((k, j) => '<th style="color:var(--c' + j + ')">' + k.nm + ' (mm)</th>').join('') + '</tr>';
-  $('tbb').innerHTML = BLN.map((b, i) => '<tr><td>' + b + '</td>' + KAB.map((k, j) => {
-    const r = rowsOf(k.id, tahun)[i];
-    if (!r) return '<td class="na">–</td>';
-    tot[j] += r.mm;
-    if (!r.lengkap) parsial = true;
-    return '<td><b>' + fmt(r.mm) + (r.lengkap ? '' : '*') + '</b><span class="ps">' + fmt(r.pos_rata, 0) + ' pos</span></td>';
+  $('hb').innerHTML = '<tr><th>Bulan</th>' + KAB.map((k, j) => `<th style="color:var(--c${j})">${k.nm} (mm)</th>`).join('') + '</tr>';
+  $('tbb').innerHTML = BLN.map((b, i) => `<tr><td>${b}</td>` + KAB.map((k, j) => {
+    const r = rowsOf(k.id, tahun)[i]; if (!r) return '<td class="na">–</td>'; tot[j] += r.mm;
+    return `<td><b>${fmt(r.mm)}${r.lengkap ? '' : '*'}</b><span class="ps">${fmt(r.pos_rata, 0)} pos</span></td>`;
   }).join('') + '</tr>').join('');
-  $('tfb').innerHTML = '<tr><td>Total ' + tahun + '</td>' + tot.map(t => '<td>' + fmt(t) + '</td>').join('') + '</tr>';
-  $('nb').textContent = (parsial ? '* Data bulan belum lengkap, sehingga totalnya lebih kecil dari bulan penuh. ' : '') +
-    'Angka kecil di bawah total adalah rata-rata jumlah pos yang melapor pada bulan itu. Jumlah pos berbeda antar kabupaten, jadi kabupaten dengan pos sedikit bisa kurang mewakili. Nilai 0 mm bisa berarti data kosong; cek jumlah pos.';
+  $('tfb').innerHTML = `<tr><td>Total ${tahun}</td>` + tot.map(t => `<td>${fmt(t)}</td>`).join('') + '</tr>';
 }
 
-/* ---------- Tab proyeksi 12 bulan ---------- */
+/* ---------- Tab Proyeksi ---------- */
 const CN = { bn: 'Bawah Normal', n: 'Normal', an: 'Atas Normal' }, CC = { bn: 'var(--c1)', n: 'var(--mut)', an: 'var(--c2)' };
 const SB = { obs: 'OBS', mtd: 'MTD', fc: 'FCST', stat: 'STAT', pro: 'PROY' };
-const SN2 = { obs: 'observasi bulanan', mtd: 'rerata mingguan bulan berjalan', fc: 'prakiraan spreadsheet', stat: 'estimasi statistik', pro: 'persistensi meluruh dari observasi terakhir' };
 const bl = m => BLN[m.mo - 1] + ' ' + m.y;
+
+function getWarningBadge(pmArray) {
+    // Cek 3 bulan pertama
+    let bnCount = 0, anCount = 0;
+    pmArray.slice(0,3).forEach(c => {
+        if(!c.none) { if(c.cat === 'bn') bnCount++; else if (c.cat === 'an') anCount++; }
+    });
+    if(bnCount >= 2) return `<span class="badge-warn">⚠️ Waspada Kekeringan</span>`;
+    if(anCount >= 2) return `<span class="badge-warn badge-flood">⚠️ Waspada Genangan</span>`;
+    return "";
+}
+
+function renderAgriTimeline(pmArray) {
+    let s = "";
+    pmArray.forEach(c => {
+        if(c.none) return;
+        let color = c.mean < 100 ? "var(--kritis)" : c.mean <= 200 ? "var(--menengah)" : "var(--aman)";
+        let title = `${BLN[c.m.mo-1].slice(0,3)}: ${fmt(c.mean,0)}mm`;
+        s += `<div style="background:${color}" data-title="${title}"></div>`;
+    });
+    $('agri-cal').innerHTML = s;
+}
 
 function proy() {
   const id = kab, ens = ensoAutoFor(MONTHS), ev = ens.map(r => r.v);
@@ -585,65 +796,54 @@ function proy() {
   const ok = PM.filter(c => !c.none), th = tahunan(id), cur = ensoAutoFor(CAL)[now.getMonth()], e = cur.v;
   const last = A[id].rain.reduce((a, t) => !a || t.y * 12 + t.mo > a.y * 12 + a.mo ? t : a, null);
   const pc = th.tb ? (th.tp - th.tb) / th.tb * 100 : null;
-  const c = (a, v, t) => '<div class="card"><div class="k">' + a + '</div><div class="v">' + v + '</div><div class="s">' + t + '</div></div>';
-  $('cp').innerHTML =
-    c('Normal tahunan ' + nmKab(), fmt(th.tb, 0) + ' <small>mm</small>', 'Jumlah rerata ' + th.n + ' bulan lengkap sejak ' + A[id].y0) +
-    c('Total ' + REPORT_YEAR + ' (aktual + model)', fmt(th.tp, 0) + ' <small>mm</small>', (pc == null ? '' : (pc < 0 ? '▼ ' : '▲ ') + fmt(Math.abs(pc), 1) + '% dari normal · ') + th.nO + ' bulan aktual + ' + (th.n - th.nO) + ' estimasi') +
-    c('ENSO terkini', '<span class="' + kls(e) + '">' + fase(e) + '</span>', BLN[now.getMonth()] + ' ' + now.getFullYear() + ' · Niño-3.4 ' + sg(e) + ' · ' + SN2[cur.s]) +
-    c('Akhir data latih hujan', last ? fmt(last.mm) + ' <small>mm</small>' : '–', last ? 'Kalibrasi memakai bulan lengkap sampai ' + bl(last) : 'belum ada data');
+  const badgeHtml = getWarningBadge(PM);
 
-  // ringkasan semua kabupaten
-  $('thy').textContent = 'Total ' + REPORT_YEAR + ' (mm)';
+  const c = (a, v, t, ext="") => `<div class="card">${ext}<div class="k">${a}</div><div class="v">${v}</div><div class="s">${t}</div></div>`;
+  $('cp').innerHTML =
+    c('Normal tahunan', fmt(th.tb, 0) + ' <small>mm</small>', 'Rerata ' + th.n + ' bulan lengkap') +
+    c('Estimasi ' + REPORT_YEAR, fmt(th.tp, 0) + ' <small>mm</small>', (pc == null ? '' : (pc < 0 ? '▼ ' : '▲ ') + fmt(Math.abs(pc), 1) + '% dari normal'), badgeHtml) +
+    c('ENSO terkini', `<span class="${kls(e)}">${fase(e)}</span>`, `Niño-3.4 ${sg(e)}`) +
+    c('Data Hujan Terakhir', last ? fmt(last.mm) + ' <small>mm</small>' : '–', last ? bl(last) : 'belum ada');
+
   $('tsb').innerHTML = KAB.map((k, j) => {
     const ms = compute(k.id, MONTHS, ev).filter(x => !x.none), ty = tahunan(k.id);
-    if (!ms.length) return '<tr><td><i class="dot" style="background:var(--c' + j + ')"></i>' + k.nm + '</td><td class="na" colspan="6">data historis belum cukup</td></tr>';
-    const tb = ms.reduce((s, x) => s + x.Nm, 0), tp = ms.reduce((s, x) => s + x.mean, 0), n = x => ms.filter(y => y.cat === x).length;
-    return '<tr><td><i class="dot" style="background:var(--c' + j + ')"></i><b>' + k.nm + '</b></td><td>' + fmt(tb, 0) + '</td><td><b>' + fmt(tp, 0) + '</b></td><td class="pc">' + fmt(tp / tb * 100, 0) + '%</td><td>' + fmt(ty.tp, 0) + '</td><td>BN ' + n('bn') + ' · N ' + n('n') + ' · AN ' + n('an') + '</td><td>' + ms.filter(x => x.fitOK).length + '/' + ms.length + ' · n ' + Math.min.apply(null, ms.map(x => x.n)) + '–' + Math.max.apply(null, ms.map(x => x.n)) + '</td></tr>';
+    if (!ms.length) return `<tr><td>${k.nm}</td><td colspan="6">data belum cukup</td></tr>`;
+    const tb = ms.reduce((s, x) => s + x.Nm, 0), tp = ms.reduce((s, x) => s + x.mean, 0);
+    return `<tr><td><b>${k.nm}</b></td><td>${fmt(tb, 0)}</td><td><b>${fmt(tp, 0)}</b></td><td class="pc">${fmt(tp / tb * 100, 0)}%</td><td>${fmt(ty.tp, 0)}</td><td>BN ${ms.filter(y => y.cat === 'bn').length} · N ${ms.filter(y => y.cat === 'n').length}</td><td>${ms.filter(x => x.fitOK).length}/${ms.length}</td></tr>`;
   }).join('');
 
-  // status + deret ENSO
-  $('pbg').className = 'badge ' + ENS.mode;
-  $('pbg').textContent = { live: 'NOAA terbaru', cache: 'cache', none: 'tanpa ENSO' }[ENS.mode];
+  $('pbg').className = 'badge ' + ENS.mode; $('pbg').textContent = ENS.mode;
   $('psl').textContent = ENS.name;
-  $('psm').textContent = (ENS.mode === 'live' ? 'Diambil ' + ENS.at.toLocaleString('id-ID') + '.' :
-    ENS.mode === 'cache' ? 'Semua sumber gagal (' + ENS.err.join('; ') + '). Memakai cache ' + ENS.at.toLocaleString('id-ID') + '.' :
-    'Semua sumber gagal (' + ENS.err.join('; ') + '). Kemungkinan CORS atau jaringan; koreksi ENSO dinonaktifkan (F = 1).') +
-    ' Kalibrasi ENSO ' + nmKab() + ' memenuhi syarat pada ' + ok.filter(x => x.fitOK).length + '/' + ok.length + ' bulan proyeksi (minimal ' + MIN_N + ' pasangan valid dan uji-t ≥ ' + fmt(T_MIN, 2) + ').';
-  $('psm').textContent += (ENS.kind === 'RONI' ? ' Skala RONI (bukan OISST): kurang sebanding dengan kalibrasi.' : '') + (ENS.fstat ? ' Sheet prakiraan: ' + ENS.fstat + '.' : '');
-  $('es').innerHTML = ens.map((r, i) => '<div class="ec"><span>' + BLN[MONTHS[i].mo - 1].slice(0, 3) + ' ' + String(MONTHS[i].y).slice(2) + '</span><b class="' + kls(r.v) + '">' + sg(r.v) + '</b><small>' + SB[r.s] + '</small></div>').join('');
+  $('es').innerHTML = ens.map((r, i) => `<div class="ec"><span>${BLN[MONTHS[i].mo - 1].slice(0, 3)}</span><b class="${kls(r.v)}">${sg(r.v)}</b><small>${SB[r.s]}</small></div>`).join('');
 
-  $('jp2').textContent = 'Proyeksi 12 bulan ke depan, ' + nmKab() + ' (' + bl(MONTHS[0]) + ' – ' + bl(MONTHS[11]) + ')';
-  $('jp3').textContent = 'Total per bulan dan peluang kategori, ' + nmKab();
   grafikProy();
-
+  
   let tb = 0, tp = 0;
   $('tpm').innerHTML = PM.map(x => {
-    if (x.none) return '<tr><td>' + bl(x.m) + '</td><td class="na" colspan="9">data historis belum cukup (kurang dari 3 bulan lengkap)</td></tr>';
+    if (x.none) return `<tr><td>${bl(x.m)}</td><td colspan="9">data historis belum cukup</td></tr>`;
     const d = x.mean - x.Nm; tb += x.Nm; tp += x.mean;
-    return '<tr><td>' + bl(x.m) + '</td><td>' + fmt(x.Nm, 0) + '</td><td><b>' + fmt(x.mean, 0) + '</b></td><td>' + fmt(x.p10, 0) + '–' + fmt(x.p90, 0) + '</td><td>' + fmt(x.mean / x.Nm * 100, 0) + '% <span class="' + (d < 0 ? 'fe' : 'fl') + '">(' + (d > 0 ? '+' : '') + fmt(d, 0) + ')</span></td><td class="' + kls(x.e) + '">' + sg(x.e) + '</td><td>' + fmt(x.F, 2) + (x.fitOK ? '' : ' *') + '</td><td class="na">' + x.n + ' / ' + fmt(x.t, 2) + '</td>' +
-      '<td><div class="pr"><div class="pb"><i style="width:' + x.pb * 100 + '%;background:var(--c1)"></i><i style="width:' + x.pn * 100 + '%;background:var(--mut)"></i><i style="width:' + x.pa * 100 + '%;background:var(--c2)"></i></div><span>' + Math.round(x.pb * 100) + '/' + Math.round(x.pn * 100) + '/' + Math.round(x.pa * 100) + '%</span></div></td><td><span class="cat ' + x.cat + '">' + CN[x.cat] + '</span></td></tr>';
+    return `<tr><td>${bl(x.m)}</td><td>${fmt(x.Nm, 0)}</td><td><b>${fmt(x.mean, 0)}</b></td><td>${fmt(x.p10, 0)}–${fmt(x.p90, 0)}</td><td>${fmt(x.mean / x.Nm * 100, 0)}% <span class="${d < 0 ? 'fe' : 'fl'}">${d > 0 ? '+' : ''}${fmt(d, 0)}</span></td><td class="${kls(x.e)}">${sg(x.e)}</td><td>${fmt(x.F, 2)}</td><td class="na">${x.n}/${fmt(x.t, 2)}</td><td><div class="pr"><div class="pb"><i style="width:${x.pb * 100}%;background:var(--c1)"></i><i style="width:${x.pn * 100}%;background:var(--mut)"></i><i style="width:${x.pa * 100}%;background:var(--c2)"></i></div><span>${Math.round(x.pb * 100)}/${Math.round(x.pn * 100)}/${Math.round(x.pa * 100)}%</span></div></td><td><span class="cat ${x.cat}">${CN[x.cat]}</span></td></tr>`;
   }).join('');
-  $('tpf').innerHTML = '<tr><td>Total 12 bulan</td><td>' + fmt(tb, 0) + '</td><td>' + fmt(tp, 0) + '</td><td>—</td><td>' + (tb ? fmt(tp / tb * 100, 0) + '%' : '–') + '</td><td colspan="5"></td></tr>';
-  $('pnt').textContent = '* = koreksi ENSO tidak diterapkan (pasangan data kurang atau hubungan tidak signifikan), proyeksi = baseline. Baseline = rerata bulan yang sama dari seluruh bulan lengkap ' + nmKab() + ', bukan normal BMKG 1991–2020. Koreksi ENSO: regresi log-link antara hujan bulanan dan rerata Niño-3.4 1–3 bulan sebelumnya, kemiringan disusutkan b·n/(n+' + SHRINK + ') dan dilemahkan menurut lead. P10–P90 dan peluang memakai distribusi Gamma dengan CV bulanan historis (batas 0,2–1,5) yang melebar 4% per bulan lead; BN < 85% dan AN > 115% baseline. Peluang belum terkalibrasi empiris, IOD belum dipakai, dan jumlah pos yang berubah antar tahun dapat memengaruhi baseline. Model eksperimental, bukan prakiraan resmi BMKG.';
+  $('tpf').innerHTML = `<tr><td>Total</td><td>${fmt(tb, 0)}</td><td>${fmt(tp, 0)}</td><td>—</td><td>${tb ? fmt(tp / tb * 100, 0) + '%' : '–'}</td><td colspan="5"></td></tr>`;
+  
+  renderAgriTimeline(PM);
+  $('th-filter').dispatchEvent(new Event('input'));
 }
 
 function grafikProy() {
   const ok = PM.filter(c => !c.none), u = ukur('pc'), W = u.W, H = u.kecil ? 290 : 330, fb = u.fb, fa = u.fa;
   const m = { l: u.kecil ? 38 : 48, r: 8, t: 16, b: 46 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12, bw = cw * .8;
   const mx = Math.max(10, ...ok.map(c => Math.max(c.p90, c.Nm, c.mean))) * 1.08, st = langkah(mx), top = Math.ceil(mx / st) * st, Y = v => m.t + ph - v / top * ph;
-  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
-  for (let v = 0; v <= top + 1e-9; v += st)
-    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--line)"/>' +
-         '<text x="' + (m.l - 5) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="' + fa + '" fill="var(--mut)">' + fmt(v, 0) + '</text>';
+  let s = `<svg viewBox="0 0 ${W} ${H}" font-family="system-ui,sans-serif">`;
+  for (let v = 0; v <= top + 1e-9; v += st) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
   PM.forEach((c, i) => {
     const cx = m.l + cw * (i + .5);
-    s += '<text x="' + cx + '" y="' + (H - 26) + '" text-anchor="middle" font-size="' + fb + '" font-weight="600" fill="var(--ink)">' + BLN[c.m.mo - 1].slice(0, 3) + '</text>';
-    if (i === 0 || c.m.mo === 1) s += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="' + fa + '" fill="var(--mut)">’' + String(c.m.y).slice(2) + '</text>';
+    s += `<text x="${cx}" y="${H - 26}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[c.m.mo - 1].slice(0, 3)}</text>`;
     if (c.none) return;
-    s += '<g><title>' + bl(c.m) + ': baseline ' + fmt(c.Nm, 0) + ' mm · model ' + fmt(c.mean, 0) + ' mm · P10–P90 ' + fmt(c.p10, 0) + '–' + fmt(c.p90, 0) + ' mm · Niño-3.4 ' + sg(c.e) + ' · ' + CN[c.cat] + '</title>' +
-      '<rect x="' + (cx - bw / 2) + '" y="' + Y(c.Nm) + '" width="' + bw + '" height="' + Math.max(1.5, c.Nm / top * ph) + '" rx="3" fill="var(--mut)" opacity=".25" stroke="var(--mut)"/>' +
-      '<line x1="' + cx + '" x2="' + cx + '" y1="' + Y(c.p90) + '" y2="' + Y(c.p10) + '" stroke="var(--mut)" stroke-width="2"/>' +
-      '<rect x="' + (cx - bw * .3) + '" y="' + Y(c.mean) + '" width="' + bw * .6 + '" height="' + Math.max(1.5, c.mean / top * ph) + '" rx="3" fill="' + CC[c.cat] + '"/></g>';
+    const tip = `${bl(c.m)}: Model ${fmt(c.mean, 0)} mm | Baseline ${fmt(c.Nm, 0)} mm | ${CN[c.cat]}`;
+    s += `<rect x="${cx - bw / 2}" y="${Y(c.Nm)}" width="${bw}" height="${Math.max(1.5, c.Nm / top * ph)}" rx="3" fill="var(--mut)" opacity=".25" stroke="var(--mut)" data-tip="${tip}"/>` +
+         `<line x1="${cx}" x2="${cx}" y1="${Y(c.p90)}" y2="${Y(c.p10)}" stroke="var(--mut)" stroke-width="2"/>` +
+         `<rect x="${cx - bw * .3}" y="${Y(c.mean)}" width="${bw * .6}" height="${Math.max(1.5, c.mean / top * ph)}" rx="3" fill="${CC[c.cat]}" data-tip="${tip}"/>`;
   });
   $('pc').innerHTML = s + '</svg>';
 }
@@ -651,97 +851,42 @@ function grafikProy() {
 function render() {
   const sm = mode === 'semua', py = mode === 'proy', ys = daftarTahun();
   $('bk').hidden = sm; $('bt').hidden = py; $('vk').hidden = mode !== 'kab'; $('vb').hidden = !sm; $('vp').hidden = !py;
-  $('md').innerHTML = [['kab', 'Per kabupaten'], ['semua', 'Bandingkan semua'], ['proy', 'Proyeksi 12 bulan']].map(x => '<button type="button" data-m="' + x[0] + '" aria-pressed="' + (mode === x[0]) + '">' + x[1] + '</button>').join('');
-  $('kb').innerHTML = KAB.map(k => '<button type="button" data-k="' + k.id + '" aria-pressed="' + (k.id === kab) + '">' + k.nm + '</button>').join('');
-  $('thn').innerHTML = ys.map(y => '<option value="' + y + '">' + y + '</option>').join('');
-  $('thn').value = tahun;
+  $('md').innerHTML = [['kab', 'Per kabupaten'], ['semua', 'Bandingkan'], ['proy', 'Proyeksi 12 bulan']].map(x => `<button type="button" data-m="${x[0]}" aria-pressed="${mode === x[0]}">${x[1]}</button>`).join('');
+  $('kb').innerHTML = KAB.map(k => `<button type="button" data-k="${k.id}" aria-pressed="${k.id === kab}">${k.nm}</button>`).join('');
+  $('thn').innerHTML = ys.map(y => `<option value="${y}">${y}</option>`).join(''); $('thn').value = tahun;
   $('prev').disabled = tahun <= ys[ys.length - 1]; $('next').disabled = tahun >= ys[0];
-  if (py) {
-    const judul = 'Proyeksi Curah Hujan 12 Bulan Kabupaten ' + nmKab();
-    $('jd').textContent = judul; document.title = judul;
-    proy();
-  } else if (sm) {
-    const judul = 'Curah Hujan ' + semuaNama();
-    $('jd').textContent = judul; document.title = judul;
-    $('jb').textContent = 'Total curah hujan per bulan, ' + tahun;
-    $('jbt').textContent = 'Rincian per bulan, ' + tahun + ' (mm dan jumlah pos)';
-    kartuBanding(); chipBanding(); banding(); tabelBanding();
-  } else {
-    const rows = S().years[tahun] || Array(12).fill(null), judul = 'Kabupaten ' + nmKab();
-    $('jd').textContent = 'Data Riwayat Curah Hujan Tahunan ' + judul + ' (sejak ' + S().y0 + '–saat ini)';
-    document.title = 'Riwayat Curah Hujan ' + judul;
-    $('jc').textContent = 'Total curah hujan per bulan, ' + tahun;
-    $('je').textContent = 'ENSO (ONI) per bulan, ' + tahun;
-    $('jt').textContent = 'Rincian per bulan, ' + tahun;
+  if (py) { $('jd').textContent = 'Proyeksi Curah Hujan ' + nmKab(); proy(); }
+  else if (sm) { $('jd').textContent = 'Perbandingan Kabupaten'; kartuBanding(); chipBanding(); banding(); tabelBanding(); updateMap(); }
+  else {
+    $('jd').textContent = 'Riwayat Hujan Kabupaten ' + nmKab();
+    const rows = S().years[tahun] || Array(12).fill(null);
     kartu(rows); gambar(rows); gambarEnso(); tabel(rows);
   }
-  try { history.replaceState(null, '', '#' + (py ? 'proy-' + kab : sm ? 'semua-' + tahun : kab + '-' + tahun)); } catch (e) { /* abaikan */ }
 }
 
 function pilihTahun(y) { if (daftarTahun().indexOf(y) > -1) { tahun = y; render(); } }
-function pilihKab(id) {
-  if (!A[id] || !Object.keys(A[id].years).length) return;
-  kab = id; const ys = daftarTahun();
-  if (ys.indexOf(tahun) < 0) tahun = ys[0];
-  render();
-}
+function pilihKab(id) { if (!A[id] || !Object.keys(A[id].years).length) return; kab = id; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); }
 
 async function muat() {
   $('st').hidden = false; $('st').textContent = 'Memuat data…';
   try {
-    if (API_URL.indexOf('GANTI_') === 0) throw new Error('API_URL belum diisi');
-    const u = API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=';
-    const [res] = await Promise.all([fetch(u + 'ch_bulanan&kab=semua'), ambilEnso()]);   // ambilEnso tidak pernah melempar galat
+    const [res] = await Promise.all([fetch(API_URL + '?aksi=ch_bulanan&kab=semua'), ambilEnso()]);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const j = await res.json();
-    if (j.error) throw new Error(j.error);
-    if (!j.data) throw new Error('data kosong');
+    const j = await res.json(); if (j.error) throw new Error(j.error);
     RAW = j.data; proses(RAW);
-    const hs = location.hash.slice(1), h = hs.match(/^([a-z]+)-(\d{4})$/), hp = hs.match(/^proy-([a-z]+)$/);
-    mode = hp ? 'proy' : h && h[1] === 'semua' ? 'semua' : 'kab';
-    const kk = hp ? hp[1] : h && h[1];
-    kab = kk && A[kk] && Object.keys(A[kk].years).length ? kk : (A.wajo && Object.keys(A.wajo.years).length ? 'wajo' : KAB.filter(k => Object.keys(A[k.id].years).length)[0].id);
-    const ys = daftarTahun();
-    tahun = h && ys.indexOf(+h[2]) > -1 ? +h[2] : ys[0];
-    $('upd').textContent = 'Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos yang melapor per kabupaten · diperbarui ' +
-      new Date(j.diperbarui).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const ys = daftarTahun(); tahun = ys[0];
     $('st').hidden = true; $('app').hidden = false;
     render();
-  } catch (e) {
-    $('st').innerHTML = 'Data belum bisa dimuat (' + e.message + '). <button type="button" id="ulang">Coba lagi</button>';
-    $('ulang').onclick = muat;
-  }
+  } catch (e) { $('st').innerHTML = 'Gagal memuat (' + e.message + ')'; }
 }
 
-$('md').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b || b.dataset.m === mode) return;
-  mode = b.dataset.m;
-  const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0];
-  render();
-});
+$('md').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.dataset.m === mode) return; mode = b.dataset.m; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); });
 $('kb').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pilihKab(b.dataset.k); });
-$('chip').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length;
-  if (!hid[id] && tersisa <= 1) return;   // minimal satu kabupaten tampil
-  hid[id] = !hid[id]; chipBanding(); banding();
-});
+$('chip').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; chipBanding(); banding(); updateMap(); });
 $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); proses(RAW); render(); $('rf').disabled = false; };
 $('thn').onchange = e => pilihTahun(+e.target.value);
-$('prev').onclick = () => pilihTahun(tahun - 1);
-$('next').onclick = () => pilihTahun(tahun + 1);
-let lw = 0, rz;
-addEventListener('resize', () => {
-  clearTimeout(rz);
-  rz = setTimeout(() => {
-    if (!tahun) return;
-    const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth;
-    if (w && w !== lw) {
-      lw = w;
-      if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { gambar(S().years[tahun] || Array(12).fill(null)); gambarEnso(); }
-    }
-  }, 150);
-});
+$('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
+let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { gambar(S().years[tahun] || Array(12).fill(null)); gambarEnso(); } } }, 150); });
 muat();
 </script>
 </body>
