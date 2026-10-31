@@ -220,7 +220,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
       <section class="box">
         <h2>Peta Sebaran Curah Hujan Tahunan</h2>
-        <p class="sub" style="margin-top:-5px;">Distribusi volume spasial untuk kabupaten/kota yang dipilih pada tombol di atas</p>
+        <p class="sub" style="margin-top:-5px;">Distribusi volume spasial untuk kabupaten/kota yang dipilih pada tombol di bawah peta</p>
         <div id="map"></div>
 <div id="mapleg"></div>
       </section>
@@ -339,8 +339,8 @@ const KAB = [
   { id: 'jeneponto', nm: 'Jeneponto', lat: -5.65, lng: 119.73 }
 ];
 // kabupaten yang tampil di mode "Bandingkan" dan peta saat pertama dibuka (ubah bila mau tampil semua)
-const TAMPIL_AWAL = ['bone', 'soppeng', 'wajo', 'sidrap'];
-// 4 kabupaten pertama memakai warna CSS lama; sisanya warna otomatis
+const TAMPIL_AWAL = KAB.map(k => k.id);   // semua tampil saat dashboard dibuka
+const HANYA = ['wajo'];                   // untuk tombol "Hanya Wajo"
 const wk = j => j < 4 ? `var(--c${j})` : `hsl(${Math.round((j * 137.5 + 60) % 360)}, 62%, 48%)`;
   const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const $ = id => document.getElementById(id);
@@ -976,7 +976,7 @@ function kartuBanding() {
 }
 function chipBanding() {
   $('chip').innerHTML = KAB.map((k, j) => `<button type="button" data-k="${k.id}" aria-pressed="${!hid[k.id]}"><i class="dot" style="background:${wk(j)}"></i>${k.nm}</button>`).join('') +
-    '<button type="button" data-a="semua">Tampilkan semua</button><button type="button" data-a="awal">Hanya 4 awal</button>';
+    '<button type="button" data-a="semua">Tampilkan semua</button><button type="button" data-a="awal">Hanya Wajo</button>';
 }
 function banding() {
   const u = ukur('cmp'), W = u.W, H = u.kecil ? 290 : 320, fb = u.fb, fa = u.fa;
@@ -1152,7 +1152,7 @@ $('md').addEventListener('click', e => { const b = e.target.closest('button'); i
 $('kb').addEventListener('change', e => { if (e.target.id === 'kabsel') pilihKab(e.target.value); });
 $('chip').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.a) { KAB.forEach(k => { hid[k.id] = b.dataset.a === 'semua' ? false : TAMPIL_AWAL.indexOf(k.id) < 0; }); }
+  if (b.dataset.a) { KAB.forEach(k => { hid[k.id] = b.dataset.a === 'semua' ? false : HANYA.indexOf(k.id) < 0; }); }
   else { const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; }
   mapFit = false;
   chipBanding(); kartuBanding(); banding(); tabelBanding(); bukaPeta();
