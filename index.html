@@ -582,7 +582,7 @@ async function ft(u, ms = 12000) {
 }
 const NUM = s => s !== '' && !isNaN(+s);
 const toObs = d => { const o = {}; Object.keys(d).forEach(y => (d[y] || []).forEach((v, m) => { if (v != null && isFinite(v)) o[y + '-' + (m + 1)] = +v; })); return o; };
-const pBr = t => { const j = JSON.parse(t); if (!j.ok) throw new Error('jembatan gagal'); return { obs: j.series || {}, fcst: j.forecast || {}, mtd: j.mtd || {}, fauto: j.forecastAuto || {}, kind: j.kind, fstat: j.forecastStatus, name: 'Apps Script jembatan · ' + (j.source || 'NOAA CPC') }; };
+const pBr = t => { const j = JSON.parse(t); if (!j.ok) throw new Error('jembatan gagal'); return { obs: j.series || {}, fcst: j.forecast || {}, mtd: j.mtd || {}, fauto: j.forecastAuto || {}, kind: j.kind, fstat: j.forecastStatus, name: 'Sumber Data ENSO ' + (j.source || 'NOAA CPC') }; };
 const pSst = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length >= 10 && p.slice(0, 10).every(NUM)) { const y = +p[0], m = +p[1], v = +p[9]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'OISST', name: 'NOAA CPC · sstoi.indices' }; };
 const pRn = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/); if (p.length === 3 && p.every(NUM)) { const y = +p[0], m = +p[1], v = +p[2]; if (y > 1900 && m >= 1 && m <= 12 && Math.abs(v) < 10) o[y + '-' + m] = v; } }); return { obs: o, fcst: {}, mtd: {}, fauto: {}, kind: 'RONI', name: 'NOAA CPC · Rnino34.ascii.txt' }; };
 const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND','NDJ'];
