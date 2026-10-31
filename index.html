@@ -113,13 +113,17 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .leaflet-tooltip-top.map-lbl::before{border-top-color:rgba(20,33,26,.88)}
 .mapleg{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--mut);margin-top:8px}
 .mapleg i{flex:1;max-width:320px;height:12px;border-radius:6px;border:1px solid var(--line)}
-.pdf-report{--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0;--kritis:#e74c3c;--menengah:#f1c40f;--aman:#2ecc71;background:#fff;color:var(--ink);font:12px/1.45 system-ui,sans-serif;padding:4px}
-.pdf-report h1{font-size:20px;margin:0}
-.pdf-report h3{font-size:13px;margin:14px 0 4px}
-.pdf-sub,.pdf-leg{color:var(--mut);font-size:11px;margin:2px 0 6px}
-.pdf-report table{min-width:0;font-size:11px;margin-top:6px}
-.pdf-report th,.pdf-report td{padding:5px 6px;white-space:nowrap}
-.pdf-report thead th{background:#f3f6f4}
+.pdf-report{--card:#fff;--ink:#14211a;--mut:#5b6b61;--line:#d8e1db;--bar:#1f77a6;--base:#d9822b;--hi:#1b5e86;--warm:#c0392b;--cool:#6b4fbb;--c0:#1f77a6;--c1:#d9822b;--c2:#1e9e7e;--c3:#7a5bd0;--kritis:#e74c3c;--menengah:#f1c40f;--aman:#2ecc71;
+  width:1030px;margin:0;padding:0;background:#fff;color:var(--ink);font:12px/1.45 system-ui,sans-serif}
+.pdf-report h1{font-size:20px;margin:0 0 2px}
+.pdf-report h3{font-size:13px;margin:0 0 4px}
+.pdf-head{padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--hi)}
+.pdf-sec{margin:0 0 10px}
+.pdf-sub,.pdf-leg{color:var(--mut);font-size:11px;margin:2px 0 0}
+.pdf-report svg{display:block;max-width:none}
+.pdf-report table{width:100%;min-width:0;border-collapse:collapse;font-size:10.5px;margin-top:6px}
+.pdf-report th,.pdf-report td{padding:4px 5px;white-space:nowrap}
+.pdf-report th{white-space:normal;vertical-align:bottom;line-height:1.2;font-size:9.5px;background:#f3f6f4}
 .pdf-report td.t{text-align:left}
 .pdf-peta{display:flex;gap:18px;align-items:flex-start}
 .pdf-map{position:relative;width:300px;height:480px;flex:none;background:#e8eeea;border:1px solid var(--line)}
@@ -127,6 +131,8 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .pdf-dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#14211a;border:2px solid #fff}
 .pdf-lbl{position:absolute;transform:translate(-50%,-135%);font-size:10px;font-weight:700;text-align:center;white-space:nowrap;background:rgba(255,255,255,.88);padding:1px 4px;border-radius:3px;line-height:1.2}
 .pdf-side{flex:1}
+.html2pdf__container{margin:0!important;left:0!important;right:auto!important;width:auto!important}
+.html2pdf__overlay{left:0!important}
 #th-filter{width:150px;max-width:none;font-size:.85rem;padding:6px 10px;min-height:36px}
 </style>
 </head>
@@ -410,32 +416,50 @@ function blokPetaPDF() {
     `</div><div class="pdf-side"><table><thead><tr><th>Peringkat</th><th>Kabupaten</th><th>Total (mm)</th></tr></thead><tbody>` +
     urut.map((p, i) => `<tr><td>${i + 1}</td><td class="t">${p.nm}</td><td>${fmt(p.v, 1)}</td></tr>`).join('') + `</tbody></table>${legendHtml(S_)}</div></div></div>`;
 }
+
+/* beri ukuran piksel eksplisit pada SVG agar html2canvas tidak mengira-ngira lebar */
+function svgTetap(h) {
+  return h.replace(/<svg viewBox="0 0 ([\d.]+) ([\d.]+)"/, (m, w, ht) => {
+    const W = PDF_W || +w, H = Math.round(+ht * W / +w);
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${w} ${ht}" style="width:${W}px;height:${H}px"`;
+  });
+}
 function blokPDF() {
+  const sv = id => svgTetap($(id).innerHTML);
+  const sek = (judul, isi, ket) => `<div class="pdf-sec pdf-keep"><h3>${judul}</h3>${isi}${ket ? `<p class="pdf-leg">${ket}</p>` : ''}</div>`;
   if (mode === 'semua') {
     const WR = ['#1f77a6', '#d9822b', '#1e9e7e', '#7a5bd0'];
     const lg = KAB.map((k, j) => hid[k.id] ? '' : `<span style="color:${WR[j]}">●</span> ${k.nm}`).join(' &nbsp; ');
-    return `<div class="pdf-keep"><h3>Perbandingan curah hujan bulanan (mm)</h3>${$('cmp').innerHTML}<p class="pdf-leg">${lg} · titik berongga = bulan belum lengkap</p></div>` + blokPetaPDF();
+    return sek('Perbandingan curah hujan bulanan (mm)', sv('cmp'), lg + ' · titik berongga = bulan belum lengkap') + blokPetaPDF();
   }
   if (mode === 'proy') {
     const lb = PM.filter(c => !c.none).map(c => `<span style="flex:1;text-align:center">${BLN[c.m.mo - 1].slice(0, 3)} ${String(c.m.y).slice(2)}</span>`).join('');
-    return `<div class="pdf-keep"><h3>Proyeksi 12 bulan ke depan (mm)</h3>${$('pc').innerHTML}<p class="pdf-leg">Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90</p></div>` +
-      `<div class="pdf-keep"><h3>Indikasi hidrologis 12 bulan</h3>${$('agri-cal').outerHTML}<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div><p class="pdf-leg">Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)</p></div>`;
+    return sek('Proyeksi 12 bulan ke depan (mm)', sv('pc'), 'Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90') +
+      sek('Indikasi hidrologis 12 bulan', $('agri-cal').outerHTML.replace(' id="agri-cal"', '') + `<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div>`, 'Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)');
   }
-  return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap</p></div>` +
-    `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`+ `<div class="pdf-keep"><h3>Jumlah hari hujan per bulan</h3>${$('hh').innerHTML}<p class="pdf-leg">Hari hujan = rata-rata curah hujan harian &gt; 0 mm · batang pudar = data belum lengkap</p></div>`;
+  return sek('Curah hujan per bulan (mm)', sv('chart'), 'Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap') +
+    sek('ENSO (ONI) per bulan', sv('enso'), 'Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral') +
+    sek('Jumlah hari hujan per bulan', sv('hh'), 'Hari hujan = rata-rata curah hujan harian &gt; 0 mm · batang pudar = data belum lengkap');
 }
 async function unduhPDF() {
   if (typeof html2pdf === 'undefined') {
     try { await muatSkrip('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'); }
     catch (e) { alert('Pustaka PDF gagal dimuat, periksa koneksi lalu coba lagi.'); return; }
   }
-  const d = dataset(), tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const sy = window.scrollY; let d, blok;
+  PDF_W = 1030;                         // gambar ulang semua grafik selebar halaman PDF
+  try { render(); d = dataset(); blok = blokPDF(); }
+  finally { PDF_W = 0; render(); window.scrollTo(0, sy); }   // kembalikan tampilan layar
+  const tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   const el = document.createElement('div'); el.className = 'pdf-report';
-  el.innerHTML = `<h1>${d.judul}</h1><p class="pdf-sub">Telemetri BBWS Pompengan Jeneberang · dicetak ${tgl}</p>` + blokPDF() +
-    '<h3>Rincian data</h3>' + tabelHtml(d) + (d.catatan ? `<p class="pdf-leg">${d.catatan}</p>` : '');
-  html2pdf().set({ margin: [10, 10, 12, 10], filename: d.nama + '.pdf', image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#fff', windowWidth: 1100 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-keep', 'tr'] } }).from(el).save();
+  el.innerHTML = `<div class="pdf-head"><h1>${d.judul}</h1><p class="pdf-sub">Sumber Data: Telemetri BBWS Pompengan Jeneberang · dicetak ${tgl}</p></div>` + blok +
+    `<div class="pdf-sec pdf-keep"><h3>Rincian data</h3>${tabelHtml(d)}${d.catatan ? `<p class="pdf-leg">${d.catatan}</p>` : ''}</div>`;
+  await html2pdf().set({
+    margin: [10, 10, 12, 10], filename: d.nama + '.pdf', image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#fff', scrollX: 0, scrollY: 0, windowWidth: 1100 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-keep', 'tr'] }
+  }).from(el).save();
 }
 $('th-filter').addEventListener('input', function (e) {
   const val = parseFloat(e.target.value);
@@ -447,8 +471,9 @@ $('th-filter').addEventListener('input', function (e) {
 });
 // -------------------------------------------------------------
 
+let PDF_W = 0;   // >0 saat membuat PDF: grafik digambar selebar halaman PDF
 function ukur(id) {
-  const W = Math.max(300, Math.round($(id).clientWidth || 720));
+  const W = PDF_W || Math.max(300, Math.round($(id).clientWidth || 720));
   return { W: W, kecil: W < 520, fb: W < 360 ? 12 : W < 520 ? 13 : 14, fa: W < 520 ? 11 : 12 };
 }
 function pearson(p) {
