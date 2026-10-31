@@ -134,11 +134,12 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 .html2pdf__container{margin:0!important;left:0!important;right:auto!important;width:auto!important}
 .html2pdf__overlay{left:0!important}
 #th-filter{width:150px;max-width:none;font-size:.85rem;padding:6px 10px;min-height:36px}
+#kabsel{min-width:240px;max-width:100%}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1 id="jd">Data Riwayat Curah Hujan Tahunan Bone, Soppeng, Wajo, Sidrap</h1>
+  <h1 id="jd">DData Riwayat Curah Hujan Kabupaten/Kota Sulawesi Selatan</h1>
   <p class="sub" id="upd">Sumber Data: Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos per kabupaten · Data ONI s.d. <span id="ons">…</span></p>
 
   <div id="st" role="status">Memuat data…</div>
@@ -219,7 +220,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
       <section class="box">
         <h2>Peta Sebaran Curah Hujan Tahunan</h2>
-        <p class="sub" style="margin-top:-5px;">Distribusi volume spasial untuk wilayah Wajo, Bone, Soppeng, Sidrap</p>
+        <p class="sub" style="margin-top:-5px;">Distribusi volume spasial untuk kabupaten/kota yang dipilih pada tombol di atas</p>
         <div id="map"></div>
 <div id="mapleg"></div>
       </section>
@@ -305,14 +306,43 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script
-const API_URL = 'https://script.google.com/macros/s/AKfycbzWaLZiedyt5e2ebxUa-ngT3q084htbhF9YJ3WGYV6ALqhvDLHozJRXU9G_3kpkOsTe/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzkFNDaqJ5cRbHGYBwyj2OYtcfmvrx-M3ZdFHuP2L-AAhNRdfI0mVLEYbQvxorZX3-K/exec';
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
 const NOAA_RN = 'https://www.cpc.ncep.noaa.gov/data/indices/Rnino34.ascii.txt';
 
-const KAB = [{ id: 'bone', nm: 'Bone', lat: -4.8, lng: 120.12 }, { id: 'soppeng', nm: 'Soppeng', lat: -4.35, lng: 119.88 }, { id: 'wajo', nm: 'Wajo', lat: -4.09, lng: 120.16 }, { id: 'sidrap', nm: 'Sidrap', lat: -3.93, lng: 119.85 }];
-const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const KAB = [
+  { id: 'bone', nm: 'Bone', lat: -4.80, lng: 120.12 },
+  { id: 'soppeng', nm: 'Soppeng', lat: -4.35, lng: 119.88 },
+  { id: 'wajo', nm: 'Wajo', lat: -4.09, lng: 120.16 },
+  { id: 'sidrap', nm: 'Sidrap', lat: -3.93, lng: 119.85 },
+  { id: 'pangkep', nm: 'Pangkajene Kepulauan', lat: -4.80, lng: 119.57 },
+  { id: 'maros', nm: 'Maros', lat: -4.98, lng: 119.62 },
+  { id: 'barru', nm: 'Barru', lat: -4.43, lng: 119.65 },
+  { id: 'gowa', nm: 'Gowa', lat: -5.31, lng: 119.74 },
+  { id: 'makassar', nm: 'Makassar', lat: -5.14, lng: 119.41 },
+  { id: 'takalar', nm: 'Takalar', lat: -5.42, lng: 119.49 },
+  { id: 'luwu_timur', nm: 'Luwu Timur', lat: -2.60, lng: 121.10 },
+  { id: 'luwu_utara', nm: 'Luwu Utara', lat: -2.55, lng: 120.33 },
+  { id: 'sinjai', nm: 'Sinjai', lat: -5.16, lng: 120.15 },
+  { id: 'bantaeng', nm: 'Bantaeng', lat: -5.54, lng: 119.95 },
+  { id: 'toraja_utara', nm: 'Toraja Utara', lat: -2.95, lng: 119.90 },
+  { id: 'palopo', nm: 'Palopo', lat: -3.00, lng: 120.20 },
+  { id: 'parepare', nm: 'Pare Pare', lat: -4.01, lng: 119.63 },
+  { id: 'pinrang', nm: 'Pinrang', lat: -3.60, lng: 119.65 },
+  { id: 'luwu', nm: 'Luwu', lat: -3.35, lng: 120.15 },
+  { id: 'bulukumba', nm: 'Bulukumba', lat: -5.45, lng: 120.20 },
+  { id: 'enrekang', nm: 'Enrekang', lat: -3.45, lng: 119.85 },
+  { id: 'selayar', nm: 'Selayar', lat: -6.12, lng: 120.45 },
+  { id: 'tana_toraja', nm: 'Tana Toraja', lat: -3.10, lng: 119.85 },
+  { id: 'jeneponto', nm: 'Jeneponto', lat: -5.65, lng: 119.73 }
+];
+// kabupaten yang tampil di mode "Bandingkan" dan peta saat pertama dibuka (ubah bila mau tampil semua)
+const TAMPIL_AWAL = ['bone', 'soppeng', 'wajo', 'sidrap'];
+// 4 kabupaten pertama memakai warna CSS lama; sisanya warna otomatis
+const wk = j => j < 4 ? `var(--c${j})` : `hsl(${Math.round((j * 137.5 + 60) % 360)}, 62%, 48%)`;
+  const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => n == null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
 const sg = v => v == null ? '–' : (v > 0 ? '+' : '') + fmt(v, 1);
@@ -321,6 +351,7 @@ const kls = v => v >= .5 ? 'fe' : v <= -.5 ? 'fl' : 'fn';
 const valid = r => r.pos_rata == null || r.pos_rata > 0;
 const kuat = r => Math.abs(r) >= .5 ? 'kuat' : Math.abs(r) >= .3 ? 'sedang' : 'lemah';
 let ONI = {}, A = {}, RAW = {}, kab = 'wajo', tahun = null, mode = 'kab', hid = {}, PM = [];
+  KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
 let leafletMap = null; // Global Map instance
 const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; };
 const S = () => A[kab];
@@ -367,8 +398,9 @@ function dsRiwayat() {
     foot: ['Total ' + tahun, tot, hr ? tot / hr : null, hr, null, hjAda ? hj : null, null, null, null, null, '', ''], catatan: 'Total tahun dihitung dari seluruh bulan yang datanya tersedia, termasuk bulan yang belum lengkap. Hari hujan = hari dengan rata-rata curah hujan > 0 mm.' };
 }
 function dsBanding() {
-  const cols = [{h:'Bulan'}].concat(KAB.map(k => ({h: k.nm + ' (mm)', d: 1}))), tot = KAB.map(() => 0), kurang = [];
-  const rows = BLN.map((b, i) => [b].concat(KAB.map((k, j) => {
+  const vis = KAB.filter(k => !hid[k.id]);
+  const cols = [{h:'Bulan'}].concat(vis.map(k => ({h: k.nm + ' (mm)', d: 1}))), tot = vis.map(() => 0), kurang = [];
+  const rows = BLN.map((b, i) => [b].concat(vis.map((k, j) => {
     const r = rowsOf(k.id, tahun)[i]; if (!r) return null; tot[j] += r.mm; if (!r.lengkap) kurang.push(k.nm + ' ' + b.slice(0, 3)); return r.mm; })));
   return { nama: 'Banding_Hujan_' + tahun, judul: 'Perbandingan Curah Hujan Kabupaten · ' + tahun, cols, rows, foot: ['Total ' + tahun].concat(tot),
     catatan: kurang.length ? 'Data belum lengkap: ' + kurang.join(', ') + '.' : '' };
@@ -483,8 +515,8 @@ function blokPDF() {
   const sv = id => svgTetap($(id).innerHTML);
   const sek = (judul, isi, ket) => `<div class="pdf-sec pdf-keep"><h3>${judul}</h3>${isi}${ket ? `<p class="pdf-leg">${ket}</p>` : ''}</div>`;
   if (mode === 'semua') {
-    const WR = ['#1f77a6', '#d9822b', '#1e9e7e', '#7a5bd0'];
-    const lg = KAB.map((k, j) => hid[k.id] ? '' : `<span style="color:${WR[j]}">●</span> ${k.nm}`).join(' &nbsp; ');
+
+    const lg = KAB.map((k, j) => hid[k.id] ? '' : `<span style="color:${wk(j)}">●</span> ${k.nm}`).join(' &nbsp; ');
     return sek('Perbandingan curah hujan bulanan (mm)', sv('cmp'), lg + ' · titik berongga = bulan belum lengkap') + blokPetaPDF();
   }
   if (mode === 'proy') {
@@ -492,7 +524,7 @@ function blokPDF() {
     return sek('Proyeksi 12 bulan ke depan (mm)', sv('pc'), 'Batang pudar = baseline · batang berwarna = proyeksi (oranye bawah normal, abu normal, hijau atas normal) · garis = rentang P10–P90') +
       sek('Indikasi hidrologis 12 bulan', $('agri-cal').outerHTML.replace(' id="agri-cal"', '') + `<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div>`, 'Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)');
   }
-  return sek('Curah hujan per bulan (mm)', sv('chart'), 'Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap') +
+  return sek('Curah hujan per bulan (mm)', sv('chart'), 'Batang biru = total bulan · garis oranye = rata-rata sejak ' + S().y0 + ' · batang pudar = data belum lengkap') +
     sek('ENSO (ONI) per bulan', sv('enso'), 'Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral') +
     sek('Jumlah hari hujan per bulan', sv('hh'), 'Hari hujan = rata-rata curah hujan harian &gt; 0 mm · batang pudar = data belum lengkap');
 }
@@ -831,8 +863,15 @@ function tabel(rows) {
 /* ---------- Peta + ilustrasi sebaran (IDW) ---------- */
 const GEOJSON_URL = 'sulawesi-selatan.json';   // ganti dengan lokasi file Anda
 let geoData = null, geoLayer = null;
-const kunci = s => String(s || '').toLowerCase().replace(/kabupaten|kab\.|\s|-/g, '');
-const ALIAS = { bone: ['bone'], soppeng: ['soppeng'], wajo: ['wajo'], sidrap: ['sidrap', 'sidenrengrappang'] };
+const kunci = s => String(s || '').toLowerCase().replace(/kabupaten|kab\.|kota|\s|-/g, '');
+const ALIAS = {
+  bone: ['bone'], soppeng: ['soppeng'], wajo: ['wajo'], sidrap: ['sidrap', 'sidenrengrappang'],
+  pangkep: ['pangkep', 'pangkajenekepulauan', 'pangkajenedankepulauan'], maros: ['maros'], barru: ['barru'], gowa: ['gowa'],
+  makassar: ['makassar'], takalar: ['takalar'], luwu_timur: ['luwutimur'], luwu_utara: ['luwuutara'], sinjai: ['sinjai'],
+  bantaeng: ['bantaeng'], toraja_utara: ['torajautara'], palopo: ['palopo'], parepare: ['parepare'], pinrang: ['pinrang'],
+  luwu: ['luwu'], bulukumba: ['bulukumba'], enrekang: ['enrekang'], selayar: ['selayar', 'kepulauanselayar'],
+  tana_toraja: ['tanatoraja'], jeneponto: ['jeneponto']
+};
 function idDariFitur(f) {
   const p = f.properties || {};
   for (const v of Object.values(p)) {
@@ -848,7 +887,7 @@ async function muatBatas() {
     if (!geoData.features.some(f => idDariFitur(f))) console.warn('Batas dimuat, tapi tidak ada nama kabupaten yang cocok. Contoh properti:', geoData.features[0] && geoData.features[0].properties);
   } catch (e) { console.warn('Batas wilayah tidak dimuat, memakai peta sebaran IDW.', e); geoData = null; }
 }
-const B = { s: -5.2, n: -3.6, w: 119.5, e: 120.5 };
+const B = { s: -6.4, n: -2.3, w: 119.2, e: 121.3 };
 const SKALA = [[219,238,250],[158,202,225],[66,146,198],[33,113,181],[8,48,107]];
 let heatLayer = null, markerGrp = null, mapFit = false;
 function warna(t) {
@@ -885,7 +924,7 @@ function legendHtml(S_, poligon) {
 }
 function initMap() {
   if (leafletMap !== null) return;
-  leafletMap = L.map('map').setView([-4.25, 120.0], 9);
+  leafletMap = L.map('map').setView([-4.0, 120.0], 8);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(leafletMap);
   markerGrp = L.layerGroup().addTo(leafletMap);
 }
@@ -929,13 +968,15 @@ function updateMap() {
 
 function kartuBanding() {
   $('cb').innerHTML = KAB.map((k, j) => {
+    if (hid[k.id]) return '';
     const ada = rowsOf(k.id, tahun).filter(Boolean), tot = ada.reduce((a, r) => a + r.mm, 0);
-    return `<div class="card"><div class="k"><i class="dot" style="background:var(--c${j})"></i>${k.nm} ${tahun}</div>` +
-      `<div class="v" style="color:var(--c${j})">${ada.length ? fmt(tot, 0) + ' <small>mm</small>' : '–'}</div></div>`;
+    return `<div class="card"><div class="k"><i class="dot" style="background:${wk(j)}"></i>${k.nm} ${tahun}</div>` +
+      `<div class="v" style="color:${wk(j)}">${ada.length ? fmt(tot, 0) + ' <small>mm</small>' : '–'}</div></div>`;
   }).join('');
 }
 function chipBanding() {
-  $('chip').innerHTML = KAB.map((k, j) => `<button type="button" data-k="${k.id}" aria-pressed="${!hid[k.id]}"><i class="dot" style="background:var(--c${j})"></i>${k.nm}</button>`).join('');
+  $('chip').innerHTML = KAB.map((k, j) => `<button type="button" data-k="${k.id}" aria-pressed="${!hid[k.id]}"><i class="dot" style="background:${wk(j)}"></i>${k.nm}</button>`).join('') +
+    '<button type="button" data-a="semua">Tampilkan semua</button><button type="button" data-a="awal">Hanya 4 awal</button>';
 }
 function banding() {
   const u = ukur('cmp'), W = u.W, H = u.kecil ? 290 : 320, fb = u.fb, fa = u.fa;
@@ -947,7 +988,7 @@ function banding() {
   for (let v = 0; v <= top + 1e-9; v += st) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
   for (let i = 0; i < 12; i++) s += `<text x="${X(i)}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
   vis.forEach(o => {
-    const col = `var(--c${o.j})`; let d = '', prev = false;
+    const col = wk(o.j); let d = '', prev = false;
     o.rows.forEach((r, i) => { if (r) { d += (prev ? 'L' : 'M') + X(i) + ',' + Y(r.mm); prev = true; } else prev = false; });
     s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round"/>`;
     o.rows.forEach((r, i) => { if (r) s += `<circle cx="${X(i)}" cy="${Y(r.mm)}" r="4" fill="${r.lengkap ? col : 'var(--card)'}" stroke="${col}" stroke-width="2" data-tip="${o.k.nm} · ${BLN[i]}: ${fmt(r.mm)} mm"></circle>`; });
@@ -955,10 +996,10 @@ function banding() {
   $('cmp').innerHTML = s + '</svg>';
 }
 function tabelBanding() {
-  const tot = KAB.map(() => 0);
-  $('hb').innerHTML = '<tr><th>Bulan</th>' + KAB.map((k, j) => `<th style="color:var(--c${j})">${k.nm} (mm)</th>`).join('') + '</tr>';
-  $('tbb').innerHTML = BLN.map((b, i) => `<tr><td>${b}</td>` + KAB.map((k, j) => {
-    const r = rowsOf(k.id, tahun)[i]; if (!r) return '<td class="na">–</td>'; tot[j] += r.mm;
+  const vis = KAB.map((k, j) => ({ k: k, j: j })).filter(o => !hid[o.k.id]), tot = vis.map(() => 0);
+  $('hb').innerHTML = '<tr><th>Bulan</th>' + vis.map(o => `<th style="color:${wk(o.j)}">${o.k.nm} (mm)</th>`).join('') + '</tr>';
+  $('tbb').innerHTML = BLN.map((b, i) => `<tr><td>${b}</td>` + vis.map((o, c) => {
+    const r = rowsOf(o.k.id, tahun)[i]; if (!r) return '<td class="na">–</td>'; tot[c] += r.mm;
     return `<td><b>${fmt(r.mm)}${r.lengkap ? '' : '*'}</b><span class="ps">${fmt(r.pos_rata, 0)} pos</span></td>`;
   }).join('') + '</tr>').join('');
   $('tfb').innerHTML = `<tr><td>Total ${tahun}</td>` + tot.map(t => `<td>${fmt(t)}</td>`).join('') + '</tr>';
@@ -1056,7 +1097,11 @@ function render() {
   const sm = mode === 'semua', py = mode === 'proy', ys = daftarTahun();
   $('bk').hidden = sm; $('bt').hidden = py; $('vk').hidden = mode !== 'kab'; $('vb').hidden = !sm; $('vp').hidden = !py;
   $('md').innerHTML = [['kab', 'Per kabupaten'], ['semua', 'Bandingkan'], ['proy', 'Proyeksi 12 bulan']].map(x => `<button type="button" data-m="${x[0]}" aria-pressed="${mode === x[0]}">${x[1]}</button>`).join('');
-  $('kb').innerHTML = KAB.map(k => `<button type="button" data-k="${k.id}" aria-pressed="${k.id === kab}">${k.nm}</button>`).join('');
+  $('kb').innerHTML = '<select id="kabsel" aria-label="Pilih kabupaten">' +
+  KAB.slice().sort((a, b) => a.nm.localeCompare(b.nm, 'id')).map(k => {
+    const ada = A[k.id] && Object.keys(A[k.id].years).length;
+    return `<option value="${k.id}"${k.id === kab ? ' selected' : ''}${ada ? '' : ' disabled'}>${k.nm}${ada ? '' : ' (belum ada data)'}</option>`;
+  }).join('') + '</select>';
   $('thn').innerHTML = ys.map(y => `<option value="${y}">${y}</option>`).join(''); $('thn').value = tahun;
   $('prev').disabled = tahun <= ys[ys.length - 1]; $('next').disabled = tahun >= ys[0];
   if (py) { $('jd').textContent = 'Proyeksi Curah Hujan ' + nmKab(); proy(); }
@@ -1104,8 +1149,14 @@ async function muat() {
 }
 
 $('md').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.dataset.m === mode) return; mode = b.dataset.m; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); });
-$('kb').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pilihKab(b.dataset.k); });
-$('chip').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; chipBanding(); banding(); bukaPeta(); });
+$('kb').addEventListener('change', e => { if (e.target.id === 'kabsel') pilihKab(e.target.value); });
+$('chip').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.a) { KAB.forEach(k => { hid[k.id] = b.dataset.a === 'semua' ? false : TAMPIL_AWAL.indexOf(k.id) < 0; }); }
+  else { const id = b.dataset.k, tersisa = KAB.filter(k => !hid[k.id]).length; if (!hid[id] && tersisa <= 1) return; hid[id] = !hid[id]; }
+  mapFit = false;
+  chipBanding(); kartuBanding(); banding(); tabelBanding(); bukaPeta();
+});
 $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); proses(RAW); render(); $('rf').disabled = false; };
 $('thn').onchange = e => pilihTahun(+e.target.value);
 $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
