@@ -191,6 +191,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
           <span><i style="background:var(--warm)"></i>El Niño (ONI ≥ +0,5)</span>
           <span><i style="background:var(--cool)"></i>La Niña (ONI ≤ −0,5)</span>
           <span><i style="background:var(--mut);opacity:.5"></i>Netral</span>
+          <span><i style="background:var(--mut);opacity:.5;border:1px dashed var(--ink)"></i>Estimasi SST mingguan (bukan ONI resmi)</span>
         </div>
         <p class="note">ONI = anomali suhu laut Niño 3.4 (NOAA CPC). Korelasi dihitung antara ONI dan anomali hujan bulanan.<span id="pn"></span></p>
       </section>
@@ -308,7 +309,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script
-const API_URL = 'https://script.google.com/macros/s/AKfycbzkFNDaqJ5cRbHGYBwyj2OYtcfmvrx-M3ZdFHuP2L-AAhNRdfI0mVLEYbQvxorZX3-K/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwqDd7qTtJw2uiNM3zkGjH-H-mH0eF7axENIQNL4f3bAWOjb9xI0FYYo9jsC2IZ5q9y/exec';
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
@@ -353,6 +354,8 @@ const kls = v => v >= .5 ? 'fe' : v <= -.5 ? 'fl' : 'fn';
 const valid = r => r.pos_rata == null || r.pos_rata > 0;
 const kuat = r => Math.abs(r) >= .5 ? 'kuat' : Math.abs(r) >= .3 ? 'sedang' : 'lemah';
 let ONI = {}, A = {}, RAW = {}, kab = 'wajo', tahun = null, mode = 'kab', hid = {}, PM = [];
+let EST = {};   // 'YYYY-MM' -> 1 = estimasi SST mingguan, 2 = estimasi sementara
+const tandaEst = (y, i) => EST[y + '-' + ('0' + (i + 1)).slice(-2)] || 0;   // i = indeks bulan 0-11
   KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
 let leafletMap = null; // Global Map instance
 const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; };
@@ -391,10 +394,10 @@ function dsRiwayat() {
   const cols = [{h:'Bulan'},{h:'Total (mm)',d:1},{h:'Rata-rata/hari (mm)',d:2},{h:'Hari data',d:0},{h:'Hari dalam bulan',d:0},{h:'Hari hujan',d:0},{h:'Pos aktif',d:1},{h:'Rata-rata bulan ini (mm)',d:0},{h:'% dari rata-rata',d:0},{h:'ONI',d:1},{h:'Fase ENSO'},{h:'Status data'}];
   const data = BLN.map((b, i) => {
     const r = rows[i], o = oniOf(tahun, i);
-    if (!r) return [b, null, null, null, null, null, null, s.base[i], null, o, fase(o), 'Tidak ada data'];
+    if (!r) return [b, null, null, null, null, null, null, s.base[i], null, o, fase(o) + (tandaEst(tahun, i) ? ' (estimasi)' : ''), 'Tidak ada data'];
     tot += r.mm; hr += r.hari;
     const h = r.hari_hujan != null ? r.hari_hujan : null; if (h != null) { hj += h; hjAda = true; }
-    return [b, r.mm, r.hari ? r.mm / r.hari : null, r.hari, r.hari_bulan, h, r.pos_rata, s.base[i], s.base[i] ? r.mm / s.base[i] * 100 : null, o, fase(o), r.lengkap ? 'Lengkap' : 'Belum lengkap'];
+    return [b, r.mm, r.hari ? r.mm / r.hari : null, r.hari, r.hari_bulan, h, r.pos_rata, s.base[i], s.base[i] ? r.mm / s.base[i] * 100 : null, o, fase(o) + (tandaEst(tahun, i) ? ' (estimasi)' : ''), r.lengkap ? 'Lengkap' : 'Belum lengkap'];
   });
   return { nama: 'Riwayat_Hujan_' + nmKab() + '_' + tahun, judul: 'Riwayat Curah Hujan Kabupaten ' + nmKab() + ' · ' + tahun, cols, rows: data,
     foot: ['Total ' + tahun, tot, hr ? tot / hr : null, hr, null, hjAda ? hj : null, null, null, null, null, '', ''], catatan: 'Total tahun dihitung dari seluruh bulan yang datanya tersedia, termasuk bulan yang belum lengkap. Hari hujan = hari dengan rata-rata curah hujan > 0 mm.' };
@@ -734,14 +737,25 @@ async function ensoPilih() {
   ENS = { obs: {}, fcst: {}, mtd: {}, fauto: {}, name: 'Tanpa data ENSO (dianggap netral)', mode: 'none', at: null, err: err };
 }
 function terapkanOni(d) {
-  ONI = {}; let la = 0;
-  if (d && d.obs) Object.keys(d.obs).forEach(k => { const p = k.split('-').map(Number); (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k]; la = Math.max(la, p[0] * 12 + p[1] - 1); });
-  const el = $('ons'); if (el) el.textContent = la ? BLN[la % 12] + ' ' + Math.floor(la / 12) + ' (' + d.name + ')' : 'tidak tersedia';
+  ONI = {}; EST = {}; let la = 0, lr = 0;
+  (d && d.estimasi || []).forEach(k => { EST[k] = 1; });
+  (d && d.sementara || []).forEach(k => { EST[k] = 2; });
+  if (d && d.obs) Object.keys(d.obs).forEach(k => {
+    const p = k.split('-').map(Number), z = p[0] * 12 + p[1] - 1;
+    (ONI[p[0]] = ONI[p[0]] || Array(12).fill(null))[p[1] - 1] = d.obs[k];
+    la = Math.max(la, z);
+    if (!EST[p[0] + '-' + ('0' + p[1]).slice(-2)]) lr = Math.max(lr, z);
+  });
+  const nb = z => BLN[z % 12] + ' ' + Math.floor(z / 12);
+  const el = $('ons');
+  if (el) el.textContent = !la ? 'tidak tersedia'
+    : la > lr ? 'resmi s.d. ' + nb(lr) + ', estimasi s.d. ' + nb(la) + ' (' + d.name + ')'
+    : nb(la) + ' (' + d.name + ')';
 }
 async function oniLoad() {
   const pn = ft(NOAA_ONI, 8000).then(pOni).catch(() => null);   // cadangan, jalan paralel
   let d = null;
-  try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), name: 'Satelit NOAA' }; } catch (e) {}
+  try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), estimasi: o.estimasi || [], sementara: o.sementara || [], name: 'Satelit NOAA' }; } catch (e) {}
   if (!d) { const x = await pn; if (x && Object.keys(x.obs).length) d = x; }
   if (d) tulisLS(OK_, d); else d = bacaLS(OK_);
   terapkanOni(d);
@@ -778,7 +792,7 @@ function proses(data) {
     const all = [], jn = [], ye = [], ks = Object.keys(years).map(Number), satu = [];
     list.forEach(r => {
       const y = +r.bulan.slice(0, 4), m = +r.bulan.slice(5, 7) - 1, o = oniOf(y, m);
-      if (o == null || !r.lengkap || !valid(r) || !base[m]) return;
+      if (o == null || tandaEst(y, m) || !r.lengkap || !valid(r) || !base[m]) return;
       const p = [o, Math.max(-100, Math.min(200, (r.mm / base[m] - 1) * 100))];
       all.push(p); if (m >= 6 && m <= 10) jn.push(p);
     });
@@ -830,7 +844,7 @@ function gambarEnso() {
     if (x == null) return;
     const h = Math.max(1.5, Math.abs(Y(x) - y0)), pos = x >= 0;
     const fill = x >= .5 ? 'var(--warm)' : x <= -.5 ? 'var(--cool)' : 'var(--mut)';
-    s += `<rect x="${cx - bw / 2}" y="${pos ? y0 - h : y0}" width="${bw}" height="${h}" rx="2" fill="${fill}" data-tip="${BLN[i]}: ONI ${sg(x)} (${fase(x)})" ${Math.abs(x) < .5 ? 'opacity=".5"' : ''}/>` +
+    s += `<rect x="${cx - bw / 2}" y="${pos ? y0 - h : y0}" width="${bw}" height="${h}" rx="2" fill="${fill}" data-tip="${BLN[i]}: ONI ${sg(x)} (${fase(x)})${tandaEst(tahun, i) ? ' · estimasi SST mingguan' + (tandaEst(tahun, i) === 2 ? ' (sementara)' : '') : ''}" ${tandaEst(tahun, i) ? 'stroke="var(--ink)" stroke-dasharray="3 2"' : ''} ${Math.abs(x) < .5 ? 'opacity=".5"' : ''}/>` +
          `<text x="${cx}" y="${pos ? y0 - h - 4 : y0 + h + fa + 2}" text-anchor="middle" font-size="${fa}" font-weight="700" fill="var(--ink)">${sg(x)}</text>`;
   });
   $('enso').innerHTML = s + '</svg>';
@@ -884,7 +898,8 @@ function kartu(rows) {
 function tabel(rows) {
   const s = S(); let tot = 0, hr = 0, hj = 0, hjAda = false;
   $('tb').innerHTML = rows.map((r, i) => {
-    const o = oniOf(tahun, i), eh = o == null ? '<td class="na">–</td>' : `<td class="${kls(o)}">${sg(o)} ${fase(o)}</td>`;
+    const o = oniOf(tahun, i), tm = tandaEst(tahun, i) ? '*' : '',
+      eh = o == null ? '<td class="na">–</td>' : `<td class="${kls(o)}">${sg(o)}${tm} ${fase(o)}</td>`;
     if (!r) return `<tr><td>${BLN[i]}</td><td class="na" colspan="7">tidak ada data</td>${eh}</tr>`;
     tot += r.mm; hr += r.hari;
     if (r.hari_hujan != null) { hj += r.hari_hujan; hjAda = true; }
