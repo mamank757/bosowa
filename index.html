@@ -187,10 +187,19 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
       </section>
 
       <section class="box">
+  <h2 id="jh">Jumlah Hari Hujan per Bulan</h2>
+  <div id="hh" role="img" aria-label="Grafik batang jumlah hari hujan bulanan"></div>
+  <div class="leg">
+    <span><i style="background:var(--c2)"></i>Hari hujan</span>
+    <span><i style="background:var(--c2);opacity:.4"></i>Data bulan belum lengkap</span>
+  </div>
+  <p class="note">Hari hujan = jumlah hari dengan rata-rata curah hujan harian seluruh pos &gt; 0 mm. Nilai 0 mm dianggap tidak hujan.</p>
+</section>
+
+      <section class="box">
         <h2 id="jt">Rincian per bulan</h2>
         <div class="tw"><table id="tbl-riwayat">
-          <thead><tr><th>Bulan</th><th>Total (mm)</th><th>Rata-rata/hari</th><th>Data (hari)</th><th>Pos aktif</th><th>Rata-rata bln ini</th><th>% rata-rata</th><th>ENSO (ONI)</th></tr></thead>
-          <tbody id="tb"></tbody><tfoot id="tf"></tfoot>
+          <thead><tr><th>Bulan</th><th>Total (mm)</th><th>Rata-rata/hari</th><th>Data (hari)</th><th>Hari hujan</th><th>Pos aktif</th><th>Rata-rata bln ini</th><th>% rata-rata</th><th>ENSO (ONI)</th></tr></thead>          <tbody id="tb"></tbody><tfoot id="tf"></tfoot>
         </table></div>
         <div style="text-align: right; margin-top: 10px;">
             <button onclick="unduhCSV('tbl-riwayat', 'Riwayat_Hujan.csv')">📥 Unduh Data CSV</button>
@@ -290,7 +299,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script
-const API_URL = 'https://script.google.com/macros/s/AKfycbzHmd64Bj2JEFTJG4ufKJcMeutW-6f0XJE7vB5skyCIxaCZbTEqaKbWth0nduKAyoDS/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzWaLZiedyt5e2ebxUa-ngT3q084htbhF9YJ3WGYV6ALqhvDLHozJRXU9G_3kpkOsTe/exec';
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
@@ -339,16 +348,17 @@ document.addEventListener('mouseout', e => {
 
 /* ================= DATA TERSTRUKTUR → CSV & PDF ================= */
 function dsRiwayat() {
-  const s = S(), rows = s.years[tahun] || Array(12).fill(null); let tot = 0, hr = 0;
-  const cols = [{h:'Bulan'},{h:'Total (mm)',d:1},{h:'Rata-rata/hari (mm)',d:2},{h:'Hari data',d:0},{h:'Hari dalam bulan',d:0},{h:'Pos aktif',d:1},{h:'Rata-rata bulan ini (mm)',d:0},{h:'% dari rata-rata',d:0},{h:'ONI',d:1},{h:'Fase ENSO'},{h:'Status data'}];
+  const s = S(), rows = s.years[tahun] || Array(12).fill(null); let tot = 0, hr = 0, hj = 0, hjAda = false;
+  const cols = [{h:'Bulan'},{h:'Total (mm)',d:1},{h:'Rata-rata/hari (mm)',d:2},{h:'Hari data',d:0},{h:'Hari dalam bulan',d:0},{h:'Hari hujan',d:0},{h:'Pos aktif',d:1},{h:'Rata-rata bulan ini (mm)',d:0},{h:'% dari rata-rata',d:0},{h:'ONI',d:1},{h:'Fase ENSO'},{h:'Status data'}];
   const data = BLN.map((b, i) => {
     const r = rows[i], o = oniOf(tahun, i);
-    if (!r) return [b, null, null, null, null, null, s.base[i], null, o, fase(o), 'Tidak ada data'];
+    if (!r) return [b, null, null, null, null, null, null, s.base[i], null, o, fase(o), 'Tidak ada data'];
     tot += r.mm; hr += r.hari;
-    return [b, r.mm, r.hari ? r.mm / r.hari : null, r.hari, r.hari_bulan, r.pos_rata, s.base[i], s.base[i] ? r.mm / s.base[i] * 100 : null, o, fase(o), r.lengkap ? 'Lengkap' : 'Belum lengkap'];
+    const h = r.hari_hujan != null ? r.hari_hujan : null; if (h != null) { hj += h; hjAda = true; }
+    return [b, r.mm, r.hari ? r.mm / r.hari : null, r.hari, r.hari_bulan, h, r.pos_rata, s.base[i], s.base[i] ? r.mm / s.base[i] * 100 : null, o, fase(o), r.lengkap ? 'Lengkap' : 'Belum lengkap'];
   });
   return { nama: 'Riwayat_Hujan_' + nmKab() + '_' + tahun, judul: 'Riwayat Curah Hujan Kabupaten ' + nmKab() + ' · ' + tahun, cols, rows: data,
-    foot: ['Total ' + tahun, tot, hr ? tot / hr : null, hr, null, null, null, null, null, '', ''], catatan: 'Total tahun dihitung dari seluruh bulan yang datanya tersedia, termasuk bulan yang belum lengkap.' };
+    foot: ['Total ' + tahun, tot, hr ? tot / hr : null, hr, null, hjAda ? hj : null, null, null, null, null, '', ''], catatan: 'Total tahun dihitung dari seluruh bulan yang datanya tersedia, termasuk bulan yang belum lengkap. Hari hujan = hari dengan rata-rata curah hujan > 0 mm.' };
 }
 function dsBanding() {
   const cols = [{h:'Bulan'}].concat(KAB.map(k => ({h: k.nm + ' (mm)', d: 1}))), tot = KAB.map(() => 0), kurang = [];
@@ -412,7 +422,7 @@ function blokPDF() {
       `<div class="pdf-keep"><h3>Indikasi hidrologis 12 bulan</h3>${$('agri-cal').outerHTML}<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div><p class="pdf-leg">Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)</p></div>`;
   }
   return `<div class="pdf-keep"><h3>Curah hujan per bulan (mm)</h3>${$('chart').innerHTML}<p class="pdf-leg">Batang biru = total bulan · garis oranye = rata-rata sejak 1998 · batang pudar = data belum lengkap</p></div>` +
-    `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`;
+    `<div class="pdf-keep"><h3>ENSO (ONI) per bulan</h3>${$('enso').innerHTML}<p class="pdf-leg">Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral</p></div>`+ `<div class="pdf-keep"><h3>Jumlah hari hujan per bulan</h3>${$('hh').innerHTML}<p class="pdf-leg">Hari hujan = rata-rata curah hujan harian &gt; 0 mm · batang pudar = data belum lengkap</p></div>`;
 }
 async function unduhPDF() {
   if (typeof html2pdf === 'undefined') {
@@ -679,6 +689,29 @@ function gambarEnso() {
   $('enso').innerHTML = s + '</svg>';
 }
 
+function gambarHH(rows) {
+  if (!rows.some(r => r && r.hari_hujan != null)) {
+    $('hh').innerHTML = '<p class="note">Data hari hujan belum tersedia dari server. Pastikan Apps Script sudah diperbarui (field <code>hari_hujan</code>) dan di-deploy ulang.</p>';
+    return;
+  }
+  const u = ukur('hh'), W = u.W, H = u.kecil ? 220 : 240, fb = u.fb, fa = u.fa;
+  const m = { l: u.kecil ? 38 : 48, r: 6, t: 20, b: 38 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12, bw = cw * .62;
+  const maks = Math.max(5, ...rows.map(r => r && r.hari_hujan != null ? r.hari_hujan : 0));
+  const st = langkah(maks * 1.05), top = Math.ceil(maks * 1.05 / st) * st, Y = v => m.t + ph - v / top * ph;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
+  for (let v = 0; v <= top + 1e-9; v += st)
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${m.l - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="${fa}" fill="var(--mut)">${fmt(v, 0)}</text>`;
+  rows.forEach((r, i) => {
+    const cx = m.l + cw * (i + .5);
+    s += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
+    if (!r || r.hari_hujan == null) return;
+    const h = Math.max(1.5, r.hari_hujan / top * ph);
+    const tip = `${BLN[i]}: ${r.hari_hujan} hari hujan dari ${r.hari} hari data${r.lengkap ? '' : ' (bulan belum lengkap)'}`;
+    s += `<rect x="${cx - bw / 2}" y="${Y(0) - h}" width="${bw}" height="${h}" rx="3" fill="var(--c2)" data-tip="${tip}" ${r.lengkap ? '' : 'opacity=".4" stroke="var(--c2)" stroke-dasharray="3 2"'}/>` +
+         `<text x="${cx}" y="${Y(0) - h - 4}" text-anchor="middle" font-size="${fa}" font-weight="700" fill="var(--ink)">${r.hari_hujan}</text>`;
+  });
+  $('hh').innerHTML = s + '</svg>';
+}
 function kartu(rows) {
   const s = S(), ada = rows.filter(Boolean), lk = ada.filter(r => r.lengkap), total = ada.reduce((a, r) => a + r.mm, 0);
   let sm = 0, sb = 0; rows.forEach((r, i) => { if (r && r.lengkap && s.base[i] != null) { sm += r.mm; sb += s.base[i]; } });
@@ -702,16 +735,16 @@ function kartu(rows) {
 }
 
 function tabel(rows) {
-  const s = S(); let tot = 0, hr = 0, parsial = false;
+  const s = S(); let tot = 0, hr = 0, hj = 0, hjAda = false;
   $('tb').innerHTML = rows.map((r, i) => {
     const o = oniOf(tahun, i), eh = o == null ? '<td class="na">–</td>' : `<td class="${kls(o)}">${sg(o)} ${fase(o)}</td>`;
-    if (!r) return `<tr><td>${BLN[i]}</td><td class="na" colspan="6">tidak ada data</td>${eh}</tr>`;
+    if (!r) return `<tr><td>${BLN[i]}</td><td class="na" colspan="7">tidak ada data</td>${eh}</tr>`;
     tot += r.mm; hr += r.hari;
+    if (r.hari_hujan != null) { hj += r.hari_hujan; hjAda = true; }
     const pc = s.base[i] ? r.mm / s.base[i] * 100 : null, ps = r.lengkap ? '' : '*';
-    if (!r.lengkap) parsial = true;
-    return `<tr><td>${BLN[i]}</td><td><b>${fmt(r.mm)}${ps}</b></td><td>${fmt(r.hari ? r.mm / r.hari : null, 2)}</td><td>${r.hari}/${r.hari_bulan}</td><td>${fmt(r.pos_rata)}</td><td>${fmt(s.base[i], 0)}</td><td class="pc">${pc == null ? '–' : fmt(pc, 0) + '%' + ps}</td>${eh}</tr>`;
+    return `<tr><td>${BLN[i]}</td><td><b>${fmt(r.mm)}${ps}</b></td><td>${fmt(r.hari ? r.mm / r.hari : null, 2)}</td><td>${r.hari}/${r.hari_bulan}</td><td>${r.hari_hujan != null ? r.hari_hujan : '–'}</td><td>${fmt(r.pos_rata)}</td><td>${fmt(s.base[i], 0)}</td><td class="pc">${pc == null ? '–' : fmt(pc, 0) + '%' + ps}</td>${eh}</tr>`;
   }).join('');
-  $('tf').innerHTML = `<tr><td>Total ${tahun}</td><td>${fmt(tot)}</td><td>${fmt(hr ? tot / hr : null, 2)}</td><td>${hr} hari</td><td colspan="4"></td></tr>`;
+  $('tf').innerHTML = `<tr><td>Total ${tahun}</td><td>${fmt(tot)}</td><td>${fmt(hr ? tot / hr : null, 2)}</td><td>${hr} hari</td><td>${hjAda ? hj + ' hari' : '–'}</td><td colspan="4"></td></tr>`;
 }
 
 /* ---------- Tab Banding & Leaflet ---------- */
@@ -951,7 +984,7 @@ function render() {
   else {
     $('jd').textContent = 'Data Riwayat Hujan -> Kabupaten ' + nmKab();
     const rows = S().years[tahun] || Array(12).fill(null);
-    kartu(rows); gambar(rows); gambarEnso(); tabel(rows);
+    kartu(rows); gambar(rows); gambarEnso(); gambarHH(rows); tabel(rows);
   }
 }
 
@@ -996,7 +1029,7 @@ $('chip').addEventListener('click', e => { const b = e.target.closest('button');
 $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); proses(RAW); render(); $('rf').disabled = false; };
 $('thn').onchange = e => pilihTahun(+e.target.value);
 $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
-let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { gambar(S().years[tahun] || Array(12).fill(null)); gambarEnso(); } } }, 150); });
+let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { const rw = S().years[tahun] || Array(12).fill(null); gambar(rw); gambarEnso(); gambarHH(rw); } } }, 150); });
 muat();
 </script>
 </body>
