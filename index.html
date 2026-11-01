@@ -191,7 +191,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
           <span><i style="background:var(--warm)"></i>El Niño (ONI ≥ +0,5)</span>
           <span><i style="background:var(--cool)"></i>La Niña (ONI ≤ −0,5)</span>
           <span><i style="background:var(--mut);opacity:.5"></i>Netral</span>
-          <span><i style="background:var(--mut);opacity:.5;border:1px dashed var(--ink)"></i>Estimasi SST mingguan (bukan ONI resmi)</span>
+          <span><i style="background:var(--mut);opacity:.5;border:1px dashed var(--ink)"></i>Estimasi SST mingguan (bukan ONI resmi)</span>           <span><i style="background:transparent;border:2px dashed var(--mut)"></i>Prakiraan BoM (input manual)</span>
         </div>
         <p class="note">ONI = anomali suhu laut Niño 3.4 (NOAA CPC). Korelasi dihitung antara ONI dan anomali hujan bulanan.<span id="pn"></span></p>
       </section>
@@ -359,7 +359,8 @@ let BOM = {};   // 'YYYY-M' -> Niño-3.4 input manual BoM
 const tandaEst = (y, i) => EST[y + '-' + ('0' + (i + 1)).slice(-2)] || 0;   // i = indeks bulan 0-11
   KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
 let leafletMap = null; // Global Map instance
-const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; };
+const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; }; 
+const bomOf = (y, i) => { const v = BOM[y + '-' + (i + 1)]; return v === undefined ? null : v; };
 const S = () => A[kab];
 const nmKab = () => KAB.filter(k => k.id === kab)[0].nm;
 const semuaNama = () => KAB.map(k => k.nm).join(', ').replace(/, ([^,]+)$/, ', dan $1');
@@ -564,7 +565,7 @@ function blokPDF() {
       sek('Indikasi hidrologis 12 bulan', $('agri-cal').outerHTML.replace(' id="agri-cal"', '') + `<div style="display:flex;font-size:10px;color:#5b6b61">${lb}</div>`, 'Merah &lt; 100 mm (kritis) · kuning 100–200 mm (menengah) · hijau &gt; 200 mm (basah)');
   }
   return sek('Curah hujan per bulan (mm)', sv('chart'), 'Batang biru = total bulan · garis oranye = rata-rata sejak ' + S().y0 + ' · batang pudar = data belum lengkap') +
-    sek('ENSO (ONI) per bulan', sv('enso'), 'Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral') +
+    sek('ENSO (ONI) per bulan', sv('enso'), 'Merah = El Niño (≥ +0,5) · ungu = La Niña (≤ −0,5) · abu-abu = netral · batang putus-putus = prakiraan BoM') +
     sek('Jumlah hari hujan per bulan', sv('hh'), 'Hari hujan = rata-rata curah hujan harian &gt; 0 mm · batang pudar = data belum lengkap');
 }
 async function unduhPDF() {
@@ -846,7 +847,9 @@ function gambar(rows) {
 function gambarEnso() {
   const u = ukur('enso'), W = u.W, H = u.kecil ? 190 : 200, fb = u.fb, fa = u.fa;
   const m = { l: u.kecil ? 38 : 48, r: 6, t: 22, b: 36 }, pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / 12, bw = cw * .62;
-  const v = Array.from({ length: 12 }, (_, i) => oniOf(tahun, i));
+  const on = Array.from({ length: 12 }, (_, i) => oniOf(tahun, i));
+  const bm = on.map((x, i) => x == null ? bomOf(tahun, i) : null);   // bulan tanpa ONI -> pakai BoM bila ada
+  const v = on.map((x, i) => x != null ? x : bm[i]);
   const top = Math.max(2, Math.ceil(Math.max(...v.map(x => Math.abs(x || 0))) * 2) / 2);
   const Y = x => m.t + ph / 2 - x / top * (ph / 2), y0 = Y(0);
   let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" font-family="system-ui,sans-serif">';
@@ -855,15 +858,17 @@ function gambarEnso() {
     const cx = m.l + cw * (i + .5);
     s += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${BLN[i].slice(0, 3)}</text>`;
     if (x == null) return;
+    const isB = bm[i] != null, est = tandaEst(tahun, i);
     const h = Math.max(1.5, Math.abs(Y(x) - y0)), pos = x >= 0;
     const fill = x >= .5 ? 'var(--warm)' : x <= -.5 ? 'var(--cool)' : 'var(--mut)';
-    s += `<rect x="${cx - bw / 2}" y="${pos ? y0 - h : y0}" width="${bw}" height="${h}" rx="2" fill="${fill}" data-tip="${BLN[i]}: ONI ${sg(x)} (${fase(x)})${tandaEst(tahun, i) ? ' · estimasi SST mingguan' + (tandaEst(tahun, i) === 2 ? ' (sementara)' : '') : ''}" ${tandaEst(tahun, i) ? 'stroke="var(--ink)" stroke-dasharray="3 2"' : ''} ${Math.abs(x) < .5 ? 'opacity=".5"' : ''}/>` +
-         `<text x="${cx}" y="${pos ? y0 - h - 4 : y0 + h + fa + 2}" text-anchor="middle" font-size="${fa}" font-weight="700" fill="var(--ink)">${sg(x)}</text>`;
+    const tip = `${BLN[i]}: ${isB ? 'Prakiraan BoM' : 'ONI'} ${sg(x)} (${fase(x)})` + (isB ? ' · input manual' : est ? ' · estimasi SST mingguan' + (est === 2 ? ' (sementara)' : '') : '');
+    const gaya = isB ? `fill-opacity=".25" stroke="${fill}" stroke-width="2" stroke-dasharray="4 3"` : est ? 'stroke="var(--ink)" stroke-dasharray="3 2"' : '';
+    s += `<rect x="${cx - bw / 2}" y="${pos ? y0 - h : y0}" width="${bw}" height="${h}" rx="2" fill="${fill}" data-tip="${tip}" ${gaya} ${!isB && Math.abs(x) < .5 ? 'opacity=".5"' : ''}/>` +
+         `<text x="${cx}" y="${pos ? y0 - h - 4 : y0 + h + fa + 2}" text-anchor="middle" font-size="${fa}" font-weight="700"${isB ? ' font-style="italic"' : ''} fill="var(--ink)">${sg(x)}</text>`;
   });
   $('enso').innerHTML = s + '</svg>';
 }
-
-function gambarHH(rows) {
+  function gambarHH(rows) {
   if (!rows.some(r => r && r.hari_hujan != null)) {
     $('hh').innerHTML = '<p class="note">Data hari hujan belum tersedia dari server. Pastikan Apps Script sudah diperbarui (field <code>hari_hujan</code>) dan di-deploy ulang.</p>';
     return;
@@ -911,8 +916,9 @@ function kartu(rows) {
 function tabel(rows) {
   const s = S(); let tot = 0, hr = 0, hj = 0, hjAda = false;
   $('tb').innerHTML = rows.map((r, i) => {
-    const o = oniOf(tahun, i), tm = tandaEst(tahun, i) ? '*' : '',
-      eh = o == null ? '<td class="na">–</td>' : `<td class="${kls(o)}">${sg(o)}${tm} ${fase(o)}</td>`;
+       const o = oniOf(tahun, i), bo = o == null ? bomOf(tahun, i) : null, tm = tandaEst(tahun, i) ? '*' : '',
+      eh = o != null ? `<td class="${kls(o)}">${sg(o)}${tm} ${fase(o)}</td>`
+         : bo != null ? `<td class="${kls(bo)}"><i>${sg(bo)} ${fase(bo)} (BoM)</i></td>` : '<td class="na">–</td>';
     if (!r) return `<tr><td>${BLN[i]}</td><td class="na" colspan="7">tidak ada data</td>${eh}</tr>`;
     tot += r.mm; hr += r.hari;
     if (r.hari_hujan != null) { hj += r.hari_hujan; hjAda = true; }
