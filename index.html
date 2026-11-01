@@ -309,7 +309,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script
-const API_URL = 'https://script.google.com/macros/s/AKfycbwqDd7qTtJw2uiNM3zkGjH-H-mH0eF7axENIQNL4f3bAWOjb9xI0FYYo9jsC2IZ5q9y/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxEVOm6tRxU-wAW9QNIHTssHz2aU5QBTIiBTecVI6RjrO5rWZ0eSS3Jr4phX7kBv4Xs/exec';
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
@@ -355,6 +355,7 @@ const valid = r => r.pos_rata == null || r.pos_rata > 0;
 const kuat = r => Math.abs(r) >= .5 ? 'kuat' : Math.abs(r) >= .3 ? 'sedang' : 'lemah';
 let ONI = {}, A = {}, RAW = {}, kab = 'wajo', tahun = null, mode = 'kab', hid = {}, PM = [];
 let EST = {};   // 'YYYY-MM' -> 1 = estimasi SST mingguan, 2 = estimasi sementara
+let BOM = {};   // 'YYYY-M' -> Niño-3.4 input manual BoM  
 const tandaEst = (y, i) => EST[y + '-' + ('0' + (i + 1)).slice(-2)] || 0;   // i = indeks bulan 0-11
   KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
 let leafletMap = null; // Global Map instance
@@ -665,7 +666,8 @@ function predict(f, e, att) {
 function ensoAutoFor(list) {
   const kn = list.map(m => { const k = key(m);
     return ENS.obs[k] !== undefined ? { v: ENS.obs[k], s: 'obs' } : ENS.mtd[k] !== undefined ? { v: ENS.mtd[k], s: 'mtd' } :
-      ENS.fcst[k] !== undefined ? { v: ENS.fcst[k], s: 'fc' } : ENS.fauto[k] !== undefined ? { v: ENS.fauto[k], s: 'stat' } : null; });
+  BOM[k] !== undefined ? { v: BOM[k], s: 'bom' } :
+  ENS.fcst[k] !== undefined ? { v: ENS.fcst[k], s: 'fc' } : ENS.fauto[k] !== undefined ? { v: ENS.fauto[k], s: 'stat' } : null; });
   let L = -1; kn.forEach((k, i) => { if (k) L = i; });
   return list.map((m, i) => kn[i] || { v: Math.round((L >= 0 ? kn[L].v * Math.exp(-Math.max(0, i - L) / TAU) : 0) * 100) / 100, s: 'pro' });
 }
@@ -758,9 +760,20 @@ async function oniLoad() {
   try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), estimasi: o.estimasi || [], sementara: o.sementara || [], name: 'Satelit NOAA' }; } catch (e) {}
   if (!d) { const x = await pn; if (x && Object.keys(x.obs).length) d = x; }
   if (d) tulisLS(OK_, d); else d = bacaLS(OK_);
-  terapkanOni(d);
+    terapkanOni(d);
 }
-async function ambilEnso() { await Promise.all([ensoPilih(), oniLoad()]); }
+const BK = 'ch_bom_v1';
+function terapkanBom(d) { BOM = d && d.data ? toObs(d.data) : {}; }
+async function bomLoad() {
+  let d = null;
+  try {
+    const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=bom', 8000));
+    if (o && o.data) d = { data: o.data };
+  } catch (e) {}
+  if (d) tulisLS(BK, d); else d = bacaLS(BK);
+  terapkanBom(d);
+}
+async function ambilEnso() { await Promise.all([ensoPilih(), oniLoad(), bomLoad()]); }
 
 /* ---------- Pemuat pustaka malas ---------- */
 function muatSkrip(src, integrity) {
@@ -1057,7 +1070,7 @@ function tabelBanding() {
 
 /* ---------- Tab Proyeksi ---------- */
 const CN = { bn: 'Bawah Normal', n: 'Normal', an: 'Atas Normal' }, CC = { bn: 'var(--c1)', n: 'var(--mut)', an: 'var(--c2)' };
-const SB = { obs: 'OBS', mtd: 'MTD', fc: 'FCST', stat: 'STAT', pro: 'PROY' };
+const SB = { obs: 'OBS', mtd: 'MTD', bom: 'BoM', fc: 'FCST', stat: 'STAT', pro: 'PROY' };
 const bl = m => BLN[m.mo - 1] + ' ' + m.y;
 
 function getWarningBadge(pmArray) {
@@ -1108,6 +1121,8 @@ function proy() {
   $('psl').textContent = ENS.name;
   $('es').innerHTML = ens.map((r, i) => `<div class="ec"><span>${BLN[MONTHS[i].mo - 1].slice(0, 3)} ${String(MONTHS[i].y).slice(2)}</span><b class="${kls(r.v)}">${sg(r.v)}</b><small>${SB[r.s]}</small></div>`).join('');
 
+   const nb = ens.filter(r => r.s === 'bom').length;
+  $('psm').textContent = nb ? nb + ' bulan memakai input manual BoM (tab "BoM"), bukan prakiraan otomatis.' : '';
   grafikProy();
   
   let tb = 0, tp = 0;
@@ -1168,15 +1183,17 @@ function pilihKab(id) { if (!A[id] || !Object.keys(A[id].years).length) return; 
 
 async function muat() {
   $('st').hidden = false; $('st').textContent = 'Memuat data…';
-  const cd = bacaLS(DK), ce = bacaLS(CK), co = bacaLS(OK_);
+    const cd = bacaLS(DK), ce = bacaLS(CK), co = bacaLS(OK_), cb = bacaLS(BK);
   if (ce && ce.obs) ENS = Object.assign(ce, { mode: 'cache', at: new Date(ce.at), err: [] });
   if (co) terapkanOni(co);
-  let tampil = false, ensPakai = null, oniPakai = null;
+  if (cb) terapkanBom(cb);
+  let tampil = false, ensPakai = null, oniPakai = null, bomPakai = null;
   const tampilkan = () => {
     if (!RAW || !Object.keys(RAW).length) return;
     proses(RAW);
     const ys = daftarTahun(); if (tahun == null || ys.indexOf(tahun) < 0) tahun = ys[0];
-    ensPakai = ENS; oniPakai = ONI;
+    ensPakai = ENS; oniPakai = ONI; bomPakai = BOM;
+    
     $('st').hidden = true; $('app').hidden = false; tampil = true; render();
   };
   // 1) Kunjungan berulang: tampil seketika dari cache lokal
@@ -1193,7 +1210,7 @@ async function muat() {
     if (!tampil) { $('st').innerHTML = 'Gagal memuat (' + (e.name === 'AbortError' ? 'timeout' : e.message) + ') <button type="button" onclick="muat()">Coba lagi</button>'; return; }
   }
   await pEns;
-  if (tampil && (ENS !== ensPakai || ONI !== oniPakai)) tampilkan();   // hitung ulang bila ENSO baru tiba
+  if (tampil && (ENS !== ensPakai || ONI !== oniPakai || BOM !== bomPakai)) tampilkan();   // hitung ulang bila ENSO baru tiba
   await pBatas;
   if (mode === 'semua' && leafletMap) updateMap();                    // pakai batas poligon bila terlambat tiba
 }
