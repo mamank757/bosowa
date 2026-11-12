@@ -5,8 +5,8 @@ Format sumber (tanpa header):  mulai,akhir,nilai   mis. 20261026,20261101,2.88
 Tiap minggu dibagi per HARI ke bulan yang ditempatinya (minggu yang melintasi
 pergantian bulan dihitung proporsional), lalu dirata-ratakan per bulan.
 
-Pemakaian:  python scripts/fetch_bom.py            (unduh dari BoM)
-            python scripts/fetch_bom.py file.txt   (uji dengan file lokal)
+Pemakaian:  python fetch_bom.py            (unduh dari BoM)
+            python fetch_bom.py file.txt   (uji dengan file lokal)
 """
 import calendar, json, sys, time, urllib.request
 from collections import defaultdict
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 URL = "https://www.bom.gov.au/clim_data/IDCK000072/rnino_3.4.txt"
-OUT = Path(__file__).resolve().parent.parent / "data.json"
+OUT = Path(__file__).resolve().parent / "data.json"   # data.json di folder yang sama (root repo)
 MIN_HARI = 14      # bulan dipakai bila minimal 14 hari tercakup (kurang dari itu dibuang)
 MAKS = 5           # |nilai| > 5 dianggap rusak
 MIN_MINGGU = 300   # pengaman: file yang terbaca terlalu sedikit = format berubah -> gagal
