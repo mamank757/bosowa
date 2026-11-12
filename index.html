@@ -1236,5 +1236,6 @@ $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilih
 let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { const rw = S().years[tahun] || Array(12).fill(null); gambar(rw); gambarEnso(); gambarHH(rw); } } }, 150); });
 muat();
 </script>
+   <script src="perbaikan.js"></script>
 </body>
 </html>
