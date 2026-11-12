@@ -725,10 +725,8 @@ const tulisLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } 
 async function ensoPilih() {
   const err = [];
   const kand = [
-    ['jembatan Apps Script', async () => pBr(await ft(BRIDGE_URL, 8000))],
-    ['NOAA sstoi', async () => pSst(await ft(NOAA_SST, 8000))],
-    ['NOAA Rnino34', async () => pRn(await ft(NOAA_RN, 8000))]
-  ];
+  ['jembatan Apps Script', async () => pBr(await ft(BRIDGE_URL, 8000))]
+];
   const jalan = kand.map(([nm, f]) => f().then(d => { if (!d || !Object.keys(d.obs).length) throw new Error('kosong'); return d; })
     .catch(e => { err.push(nm + ': ' + (e.name === 'AbortError' ? 'timeout' : e.message)); return null; }));
   for (const p of jalan) {
@@ -756,7 +754,7 @@ function terapkanOni(d) {
     : nb(la) + ' (' + d.name + ')';
 }
 async function oniLoad() {
-  const pn = ft(NOAA_ONI, 8000).then(pOni).catch(() => null);   // cadangan, jalan paralel
+  const pn = Promise.resolve(null);   // NOAA langsung diblokir CORS, tidak dipakai
   let d = null;
   try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), estimasi: o.estimasi || [], sementara: o.sementara || [], name: 'Satelit NOAA' }; } catch (e) {}
   if (!d) { const x = await pn; if (x && Object.keys(x.obs).length) d = x; }
