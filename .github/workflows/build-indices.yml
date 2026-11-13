@@ -1,0 +1,31 @@
+name: build-indices
+on:
+  schedule:
+    - cron: '15 3 * * *'      # setelah update-rmm (02:30 UTC)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+jobs:
+  indices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pasang pustaka
+        run: pip install pandas numpy
+      - name: Bangun monthly.json (DMI + MJO + Kelvin + Rossby)
+        run: |
+          # Bila nama file Kelvin/Rossby Anda berbeda, tulis jalurnya di sini:
+          #   python scripts/build_indices.py --kelvin data/waves/kelvin.csv --rossby data/waves/rossby.csv
+          python scripts/build_indices.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/indices/monthly.json data/indices/dmi.raw.txt
+          git diff --staged --quiet || (git commit -m "Perbarui indeks bulanan" && git pull --rebase && git push)
