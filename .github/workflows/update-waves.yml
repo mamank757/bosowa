@@ -1,0 +1,38 @@
+name: update-waves
+on:
+  schedule:
+    - cron: '45 2 * * *'      # setelah update-rmm (02:30 UTC); build-indices menyusul otomatis
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+jobs:
+  waves:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45       # run pertama mengunduh ~30 tahun OLR; run berikutnya hanya hari baru
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pasang pustaka
+        run: pip install numpy pandas xarray netCDF4 pydap
+      - name: Cache OLR (supaya hanya hari baru yang diunduh)
+        uses: actions/cache@v4
+        with:
+          path: .cache/olr_strip.npz
+          key: olr-strip-${{ github.run_id }}
+          restore-keys: olr-strip-
+      - name: Hitung Kelvin dan Rossby dari OLR NOAA
+        run: |
+          # Kotak wilayah (default 115-125E). Ubah bila perlu, mis. Sulawesi Selatan saja:
+          #   python scripts/fetch_olr_waves.py --lon-min 118 --lon-max 122
+          python scripts/fetch_olr_waves.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/waves/kelvin.csv data/waves/rossby.csv data/waves/waves_meta.json
+          git diff --staged --quiet || (git commit -m "Perbarui Kelvin dan Rossby" && git pull --rebase && git push)
