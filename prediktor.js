@@ -19,7 +19,7 @@
   'use strict';
 
   const C = {
-    URL: 'https://raw.githubusercontent.com/mamank757/dasarian/refs/heads/main/data/indices/monthly.json',
+    URL: 'https://raw.githubusercontent.com/mamank757/bosowa/refs/heads/main/data/indices/monthly.json',
     LS: 'ch_idx_v1',
     LAMBDA: 8,          // penalti ridge (satuan prediktor terstandar; setara SHRINK pada kode lama)
     MARGIN: 0.03,       // dan MSE LOYO harus turun >= MARGIN (relatif)
