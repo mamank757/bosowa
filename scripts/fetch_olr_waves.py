@@ -108,14 +108,18 @@ def wave_filter(anom, pad=128):
 
 
 # ------------------------------------------------------------------ data OLR
-def open_dataset(urls, max_age_days):
+def open_one(url, engine=None):
     import xarray as xr
+    kw = {"engine": engine} if engine else {}
+    return xr.open_dataset(url, **kw)
+
+
+def open_dataset(urls, max_age_days):
     last_err = None
     for url in urls:
         for engine in ("netcdf4", "pydap", None):
             try:
-                kw = {"engine": engine} if engine else {}
-                ds = xr.open_dataset(url, **kw)
+                ds = open_one(url, engine)
                 tn = "time" if "time" in ds.coords else next(c for c in ds.coords if "time" in c.lower())
                 t_last = pd.Timestamp(ds[tn].values[-1])
                 age = (pd.Timestamp.now("UTC").tz_localize(None) - t_last).days
@@ -124,7 +128,7 @@ def open_dataset(urls, max_age_days):
                     ds.close()
                     break
                 info(f"Sumber OLR: {url} (engine={engine or 'auto'}) | data terakhir {t_last.date()}")
-                return ds, url
+                return ds, url, engine
             except Exception as e:  # noqa: BLE001
                 last_err = f"{url} [{engine}]: {e}"
     raise RuntimeError(f"Tidak ada sumber OLR yang bisa dibuka/segar. Galat terakhir: {last_err}")
@@ -167,66 +171,92 @@ def load_chunk(ds, names_, i0, i1, lat_slice, lon_idx, pairs_local, retries=4):
     raise RuntimeError(f"Gagal mengunduh blok waktu {i0}:{i1}")
 
 
-def build_series(ds, args):
+def _worker(job):
+    """Dijalankan di proses terpisah: buka dataset sendiri (netCDF4 tidak aman lintas-proses/thread)."""
+    url, engine, names_, a, b, lat_slice, lon_idx, pairs = job
+    t0 = time.time()
+    ds = open_one(url, engine)
+    try:
+        z = load_chunk(ds, names_, a, b, lat_slice, lon_idx, pairs)
+    finally:
+        ds.close()
+    return a, b, z, time.time() - t0
+
+
+def save_cache(path, d, z, lon):
+    if not path:
+        return
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp.npz"
+    np.savez_compressed(tmp, dates=d.values.astype("datetime64[D]"), z=z.astype(np.float32), lon=lon)
+    os.replace(tmp, path)
+
+
+def build_series(ds, args, url, engine):
+    """Mengembalikan (tanggal, z, longitude, lengkap). lengkap=False bila batas waktu tercapai."""
+    from concurrent.futures import ProcessPoolExecutor, TimeoutError as FTimeout
+    import multiprocessing as mp
     names_ = names(ds)
     var, tn, ln, gn = names_
     times = pd.DatetimeIndex(ds[tn].values).normalize()
     lat = np.asarray(ds[ln].values, dtype=float)
     lon = np.asarray(ds[gn].values, dtype=float) % 360.0
-    # lintang: potong blok kontigu yang mencakup pita
     sel = np.where(np.abs(lat) <= args.band + 1e-6)[0]
     lat_slice = slice(int(sel.min()), int(sel.max()) + 1)
-    lat_loc = lat[lat_slice]
-    pairs = band_pairs(lat_loc, args.band)
-    # longitude: jarak ~3 derajat, urut menaik
+    pairs = band_pairs(lat[lat_slice], args.band)
     dlon = float(np.median(np.diff(np.sort(lon))))
     stride = max(1, int(round(args.lon_step / dlon)))
     order = np.argsort(lon)
-    lon_idx = order[::stride]
-    lon_sel = lon[lon_idx]
+    if np.array_equal(order, np.arange(len(lon))):
+        lon_idx, lon_sel = slice(0, None, stride), lon[::stride]     # irisan bertahap: satu permintaan DAP efisien
+    else:
+        lon_idx = order[::stride]
+        lon_sel = lon[lon_idx]
     if abs(360.0 / len(lon_sel) - np.median(np.diff(lon_sel))) > 0.5:
         raise RuntimeError("Grid longitude tidak seragam mengelilingi bumi.")
-    info(f"Grid: {len(lat_loc)} lintang dipakai ({len(pairs)} pasangan simetris), {len(lon_sel)} longitude (tiap {dlon * stride:.1f} derajat)")
+    info(f"Grid: {lat_slice.stop - lat_slice.start} lintang dipakai ({len(pairs)} pasangan simetris), {len(lon_sel)} longitude (tiap {dlon * stride:.1f} derajat)")
 
-    # cache: dates + z (t, lon)
-    z_old, d_old = None, None
+    d_have, z_have = pd.DatetimeIndex([]), np.zeros((0, len(lon_sel)), np.float32)
     if args.cache and os.path.exists(args.cache):
         c = np.load(args.cache, allow_pickle=False)
         if c["lon"].shape == lon_sel.shape and np.allclose(c["lon"], lon_sel):
-            d_old = pd.DatetimeIndex(c["dates"].astype("datetime64[ns]"))
-            z_old = c["z"]
-            info(f"Cache dimuat: {d_old[0].date()} .. {d_old[-1].date()} ({len(d_old)} hari)")
+            d_have, z_have = pd.DatetimeIndex(c["dates"].astype("datetime64[ns]")), c["z"]
+            info(f"Cache dimuat: {d_have[0].date()} .. {d_have[-1].date()} ({len(d_have)} hari)")
         else:
             warn("Cache tidak cocok dengan grid, diabaikan.")
     start = pd.Timestamp(args.start)
-    if d_old is not None:
-        start = max(start, d_old[-1] - pd.Timedelta(days=args.refetch_days))
-        start = min(start, d_old[-1])
+    if len(d_have):
+        start = min(max(start, d_have[-1] - pd.Timedelta(days=args.refetch_days)), d_have[-1])
+        keep = d_have < start
+        d_have, z_have = d_have[keep], z_have[keep]
     i_start = int(np.searchsorted(times.values, start.to_datetime64()))
     i_end = len(times)
-    info(f"Mengunduh indeks waktu {i_start}..{i_end} ({times[i_start].date()} .. {times[-1].date()})")
-    chunks, dates_new = [], []
     step = 366
-    for a in range(i_start, i_end, step):
-        b = min(a + step, i_end)
-        z = load_chunk(ds, names_, a, b, lat_slice, lon_idx, pairs)
-        chunks.append(z)
-        dates_new.append(times[a:b])
-        info(f"  {times[a].date()} .. {times[b - 1].date()}  ok")
-    z_new = np.concatenate(chunks) if chunks else np.zeros((0, len(lon_sel)), np.float32)
-    d_new = dates_new[0].append(dates_new[1:]) if dates_new else pd.DatetimeIndex([])
-
-    if d_old is not None and len(d_old):
-        keep = d_old < d_new[0] if len(d_new) else np.ones(len(d_old), bool)
-        z_all = np.concatenate([z_old[keep], z_new])
-        d_all = d_old[keep].append(d_new)
-    else:
-        z_all, d_all = z_new, d_new
-    # cache baru
-    if args.cache:
-        os.makedirs(os.path.dirname(args.cache) or ".", exist_ok=True)
-        np.savez_compressed(args.cache, dates=d_all.values.astype("datetime64[D]"), z=z_all.astype(np.float32), lon=lon_sel)
-    return d_all, z_all, lon_sel
+    ranges = [(a, min(a + step, i_end)) for a in range(i_start, i_end, step)]
+    info(f"Mengunduh {len(ranges)} potongan ({times[i_start].date()} .. {times[-1].date()}), {args.workers} proses paralel, batas {args.max_minutes:g} menit")
+    deadline = time.time() + args.max_minutes * 60
+    jobs = [(url, engine, names_, a, b, lat_slice, lon_idx, pairs) for a, b in ranges]
+    lengkap = True
+    ex = ProcessPoolExecutor(max_workers=max(1, args.workers), mp_context=mp.get_context("spawn"))
+    futs = [ex.submit(_worker, j) for j in jobs]
+    try:
+        for f in futs:                                   # dikonsumsi BERURUTAN agar cache selalu kontinu
+            try:
+                a, b, z, dt_s = f.result(timeout=max(1.0, deadline - time.time()))
+            except FTimeout:
+                lengkap = False
+                warn("Batas waktu tercapai; kemajuan disimpan, jalankan workflow lagi untuk melanjutkan.")
+                break
+            d_have = d_have.append(times[a:b])
+            z_have = np.concatenate([z_have, z])
+            save_cache(args.cache, d_have, z_have, lon_sel)
+            info(f"  {times[a].date()} .. {times[b - 1].date()}  ok ({dt_s:.0f} dtk)")
+    finally:
+        for p in list(getattr(ex, "_processes", {}).values()):
+            if not lengkap:
+                p.terminate()
+        ex.shutdown(wait=lengkap, cancel_futures=True)
+    return d_have, z_have, lon_sel, lengkap
 
 
 def compute(d_all, z_all, lon_sel, args):
@@ -257,12 +287,18 @@ def main():
     ap.add_argument("--trim-end", type=int, default=7, help="buang N hari terakhir (efek ujung deret)")
     ap.add_argument("--refetch-days", type=int, default=30, help="unduh ulang N hari terakhir dari cache")
     ap.add_argument("--max-age-days", type=int, default=20, help="tolak sumber yang datanya lebih tua dari ini")
+    ap.add_argument("--workers", type=int, default=4, help="jumlah proses unduh paralel")
+    ap.add_argument("--max-minutes", type=float, default=100, help="batas waktu unduh; bila habis, cache disimpan dan keluar tanpa menulis CSV")
     ap.add_argument("--cache", default=".cache/olr_strip.npz")
     ap.add_argument("--out-dir", default="data/waves")
     a = ap.parse_args()
 
-    ds, url = open_dataset(a.url or DEFAULT_URLS, a.max_age_days)
-    d_all, z_all, lon_sel = build_series(ds, a)
+    ds, url, engine = open_dataset(a.url or DEFAULT_URLS, a.max_age_days)
+    d_all, z_all, lon_sel, lengkap = build_series(ds, a, url, engine)
+    ds.close()
+    if not lengkap:
+        info(f"Data baru terunduh sampai {d_all[-1].date()}; CSV belum ditulis. Jalankan ulang workflow sampai lengkap.")
+        return
     full, kel, er, nlon_box = compute(d_all, z_all, lon_sel, a)
 
     os.makedirs(a.out_dir, exist_ok=True)
