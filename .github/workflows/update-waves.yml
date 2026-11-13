@@ -11,7 +11,7 @@ concurrency:
 jobs:
   waves:
     runs-on: ubuntu-latest
-    timeout-minutes: 45       # run pertama mengunduh ~30 tahun OLR; run berikutnya hanya hari baru
+    timeout-minutes: 130      # run pertama mengunduh ~30 tahun OLR; run berikutnya hanya hari baru
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +29,8 @@ jobs:
         run: |
           # Kotak wilayah (default 115-125E). Ubah bila perlu, mis. Sulawesi Selatan saja:
           #   python scripts/fetch_olr_waves.py --lon-min 118 --lon-max 122
-          python scripts/fetch_olr_waves.py
+          # --max-minutes: bila unduhan awal belum selesai, kemajuan disimpan ke cache dan run berikutnya melanjutkan.
+          python scripts/fetch_olr_waves.py --workers 4 --max-minutes 105
       - name: Commit
         run: |
           git config user.name "github-actions"
