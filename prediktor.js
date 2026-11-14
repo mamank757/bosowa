@@ -307,7 +307,11 @@
       });
       f = cache[ck] = fitCore(yrs, tot, raw, [okE, okI, wv[0] !== null, wv[1] !== null, wv[2] !== null], .1);
     }
-    if (!f) return { s: s, lead: lead, none: true };
+    if (!f) {
+      const r = ridx(id);
+      const nw = Object.keys(r).map(Number).filter(z => z % 12 + 1 === s.mo && r[z + 1] !== undefined && r[z + 2] !== undefined).length;
+      return { s: s, lead: lead, none: true, nwin: nw };
+    }
     const xs = [okE ? mean3(ENS.obs, z0 - lagE) : null, okI ? mean3(IDX.dmi, z0 - lagI) : null].concat(wv);
     const Nm = f.mean;
     let F = 1, z = [];
@@ -423,7 +427,7 @@
     const eL = lastZ(ENS.obs), iL = IDX && IDX.dmi ? lastZ(IDX.dmi) : -1;
     const rows = WIN.map(s => {
       const x = musim(kab, s);
-      if (x.none) return '<tr><td>' + lab(s) + '</td><td colspan="13" class="na">data historis belum cukup</td></tr>';
+      if (x.none) return '<tr><td>' + lab(s) + '</td><td colspan="14" class="na">data historis belum cukup (hanya ' + x.nwin + ' tahun dengan 3 bulan lengkap berturut-turut)</td></tr>';
       const f = x.f, dl = kontribusi(x, f);
       const cells = PRED.map((p, j) => {
         if (dl && dl[j] !== undefined) return '<td style="color:' + (dl[j] < 0 ? 'var(--c1)' : 'var(--c2)') + '">' + sgm(dl[j]) + '</td>';
@@ -434,18 +438,19 @@
       return '<tr><td><b>' + lab(s) + '</b></td><td>' + x.lead + '</td><td>' + fmt(x.Nm, 0) + '</td>' + cells + '<td><b>' + fmt(x.mean, 0) + '</b></td><td>' +
         fmt(x.p10, 0) + '–' + fmt(x.p90, 0) + '</td><td class="pc">' + fmt(x.mean / x.Nm * 100, 0) + '%</td><td><div class="pr"><div class="pb"><i style="width:' + x.pb * 100 +
         '%;background:var(--c1)"></i><i style="width:' + x.pn * 100 + '%;background:var(--mut)"></i><i style="width:' + x.pa * 100 + '%;background:var(--c2)"></i></div><span>' +
-        Math.round(x.pb * 100) + '/' + Math.round(x.pn * 100) + '/' + Math.round(x.pa * 100) + '%</span></div></td><td><span class="cat ' + x.cat + '">' + CN[x.cat] + '</span></td><td class="na">' +
+        Math.round(x.pb * 100) + '/' + Math.round(x.pn * 100) + '/' + Math.round(x.pa * 100) + '%</span></div></td><td><span class="cat ' + x.cat + '">' + (f.ok ? CN[x.cat] : 'Klimatologi') + '</span></td><td class="na">' +
         (f.ok ? f.model : 'Baseline') + '<span class="ps">jeda ' + jeda + ' · n ' + f.n + '</span></td><td>' + (f.ok ? sg2(f.msess) : '–') + '</td></tr>';
     }).join('');
 
     const STD = WIN.filter(s => [12, 3, 6, 9].indexOf(s.mo) > -1);
     let nOk = 0, nAll = 0;
+    const kurang = {};
     const all = KAB.map(k => {
       const tds = STD.map(s => {
         const x = musim(k.id, s);
-        if (x.none) return '<td class="na">–</td>';
+        if (x.none) { kurang[k.nm] = 1; return '<td class="na" title="hanya ' + x.nwin + ' tahun dengan 3 bulan lengkap berturut-turut">–<span class="ps">n=' + x.nwin + '</span></td>'; }
         nAll++; if (x.f.ok) nOk++;
-        return '<td><b>' + fmt(x.mean, 0) + '</b> mm · ' + fmt(x.mean / x.Nm * 100, 0) + '%<span class="ps"><span class="cat ' + x.cat + '">' + CN[x.cat] + '</span> ' +
+        return '<td><b>' + fmt(x.mean, 0) + '</b> mm · ' + fmt(x.mean / x.Nm * 100, 0) + '%<span class="ps"><span class="cat ' + x.cat + '">' + (x.f.ok ? CN[x.cat] : 'Klimatologi') + '</span> ' +
           (x.f.ok ? 'skill ' + sg2(x.f.msess) : 'Baseline') + '</span></td>';
       }).join('');
       return '<tr><td><b>' + k.nm + '</b></td>' + tds + '</tr>';
@@ -463,7 +468,8 @@
       '<h2 style="margin-top:18px">Ringkasan musiman semua kabupaten</h2>' +
       '<div class="tw"><table id="tbl-seas-all"><thead><tr><th>Kabupaten</th>' + STD.map(s => '<th>' + lab(s) + '</th>').join('') + '</tr></thead><tbody>' + all + '</tbody></table></div>' +
       '<p class="note">Model prediktor terpilih pada ' + nOk + ' dari ' + nAll + ' kombinasi kabupaten-musim. Pada uji tanpa sinyal, sekitar 3–5% kombinasi tetap lolos karena kebetulan, ' +
-      'jadi angka kecil di sini wajar dan sebagian besar bukan hubungan nyata. Baseline berarti tidak ada prediktor yang terbukti memperbaiki prakiraan.</p>';
+      'jadi angka kecil di sini wajar dan sebagian besar bukan hubungan nyata. <b>Baseline/“Klimatologi” bukan prakiraan “normal”</b>: artinya tidak ada prediktor yang terbukti memperbaiki prakiraan, sehingga yang ditampilkan hanya rata-rata historis dan rentang ketidakpastiannya.' +
+      (Object.keys(kurang).length ? ' Data kurang (tanda “–”, kurang dari 3 tahun dengan tiga bulan lengkap berturut-turut) pada sebagian/seluruh musim: ' + Object.keys(kurang).join(', ') + '.' : '') + '</p>';
   }
 
   function pasca2() {
@@ -472,6 +478,10 @@
     const ths = document.querySelectorAll('#tsr thead th'); if (ths[6]) ths[6].textContent = 'Bulan bermodel prediktor';
     document.querySelectorAll('#tpm sup').forEach(s => { s.title = 'Model Baseline: prediktor tidak mengalahkan klimatologi (LOYO), data < ' + MIN_N + ' tahun, atau lead > ' + C.MONTHLY_MAX_LEAD + ' bulan'; });
     const psm = $('psm'); if (psm) psm.textContent += ' Prediktor tambahan: ' + statusIdx() + '.';
+    document.querySelectorAll('#tpm tr').forEach((tr, i) => {
+      const x = PM[i], c = tr.querySelector('span.cat');
+      if (x && !x.none && !x.fitOK && c && x.cat === 'n') c.textContent = 'Klimatologi';
+    });
     const cards = document.querySelectorAll('#cp .card');
     if (cards[1]) { const th = tahunan(kab), s = cards[1].querySelector('.s'); if (s && th.lo != null) s.textContent += ' · P10–P90 ' + fmt(th.lo, 0) + '–' + fmt(th.hi, 0) + ' mm'; }
     $('pnt').textContent = '† = Baseline (tanpa koreksi prediktor): tidak ada kombinasi ENSO/IOD/MJO/Kelvin/Rossby yang menurunkan galat leave-one-year-out ≥ ' +
