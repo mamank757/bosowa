@@ -23,12 +23,14 @@ jobs:
         run: pip install pandas numpy
       - name: Bangun monthly.json (DMI + MJO + Kelvin + Rossby)
         run: |
-          # Bila nama file Kelvin/Rossby Anda berbeda, tulis jalurnya di sini:
-          #   python scripts/build_indices.py --kelvin data/waves/kelvin.csv --rossby data/waves/rossby.csv
-          python scripts/build_indices.py
+          # Bila nama file Kelvin/Rossby berbeda, tulis jalurnya di sini:
+          #   --kelvin data/waves/kelvin.csv --rossby data/waves/rossby.csv
+          # --rmm-url: cadangan bila data/waves/rmm.txt belum ada di repo ini (diunduh dari repo lama).
+          python scripts/build_indices.py \
+            --rmm-url https://raw.githubusercontent.com/mamank757/dasarian/refs/heads/main/data/waves/rmm.txt
       - name: Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/indices/monthly.json data/indices/dmi.raw.txt
+          git add data/indices/
           git diff --staged --quiet || (git commit -m "Perbarui indeks bulanan" && git pull --rebase && git push)
