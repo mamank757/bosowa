@@ -1,0 +1,17 @@
+{
+ "generated": "2026-11-14T02:17:38Z",
+ "source": "https://psl.noaa.gov/thredds/dodsC/Datasets/olr_cdr_day/olr.day.mean.v2.nc",
+ "olr_last_date": "2026-11-10",
+ "written_last_date": "2026-11-03",
+ "box": {
+  "lon": [
+   115.0,
+   125.0
+  ],
+  "lat_band_symmetric": 10.0,
+  "grid_points_lon": 3
+ },
+ "kelvin": "eastward k=1-14, 2.5-17 d, h=8-90 m",
+ "rossby": "ER n=1 westward k=1-10, 9-72 d, h<=90 m",
+ "units": "W/m2 (filtered OLR anomaly; negative = enhanced convection)"
+}
