@@ -35,7 +35,8 @@
     MIN_DAYS_NOW: 10,   // bulan berjalan boleh dipakai bila >= 10 hari
     MIN_COVER: 0.6,     // prediktor dipakai bila tersedia pada >= 60% tahun latih
     MONTHLY_MAX_LEAD: 3, // model BULANAN (lag 1-3 bulan) hanya dipakai sampai lead ini; sesudahnya Baseline (pakai tabel 3 bulanan)
-    SEAS_MAX_LAG: 36     // prediktor 3 bulanan diabaikan bila data terakhirnya lebih tua dari ini (bulan)
+    SEAS_MAX_LAG: 36,    // prediktor 3 bulanan diabaikan bila data terakhirnya lebih tua dari ini (bulan)
+    POS_MIN: 0           // bulan dengan rata-rata pos aktif < nilai ini tidak dipakai sebagai data latih (0 = pakai semua)
   };
   const PRED = [
     { id: 'enso', nm: 'ENSO' },
@@ -45,6 +46,19 @@
     { id: 'rossby', nm: 'Rossby' }
   ];
   let IDX = null, iodC = null;
+  { const v = bacaLS('ch_posmin_v1'); if (typeof v === 'number' && isFinite(v) && v >= 0) C.POS_MIN = v; }
+  /* Filter jumlah pos hanya untuk data STASIUN. Data areal (jumlah pos = 1 tetap, mis. rata-rata grid dari GEE/CHIRPS)
+     tidak punya konsep jumlah pos, jadi filter diabaikan agar tidak membuang seluruh data. */
+  function isArealK(id) {
+    const c = A[id].fit;
+    if (c._areal === undefined) { const st = posStat(id); c._areal = st.length > 0 && st.every(x => x.pos <= 1.0001); }
+    return c._areal;
+  }
+  function okPos(id, t) {
+    if (!(C.POS_MIN > 0) || isArealK(id)) return true;
+    const r = (A[id].years[t.y] || [])[t.mo - 1];
+    return !r || r.pos_rata == null || r.pos_rata >= C.POS_MIN;
+  }
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const sum = a => a.reduce((s, x) => s + x, 0);
@@ -200,7 +214,7 @@
   function fit2(id, mo) {
     const cache = A[id].fit;
     if (cache[mo] !== undefined) return cache[mo];
-    const R = A[id].rain.filter(t => t.mo === mo);
+    const R = A[id].rain.filter(t => t.mo === mo && okPos(id, t));
     const raw = R.map(t => PRED.map(p => rawTrain(p, t.y, t.mo)));
     return (cache[mo] = fitCore(R.map(t => t.y), R.map(t => t.mm), raw, PRED.map(() => true), .2));
   }
@@ -279,7 +293,7 @@
   }
   function ridx(id) {
     const c = A[id].fit;
-    if (!c._r) { const m = {}; A[id].rain.forEach(t => { m[t.y * 12 + t.mo - 1] = t.mm; }); c._r = m; }
+    if (!c._r) { const m = {}; A[id].rain.forEach(t => { if (okPos(id, t)) m[t.y * 12 + t.mo - 1] = t.mm; }); c._r = m; }
     return c._r;
   }
   const WIN = Array.from({ length: 10 }, (_, i) => mk(NOWZ + 1 + i));   // periode 3 bulan yang dimulai Des..Sep (menutup 12 bulan ke depan)
@@ -472,6 +486,47 @@
       (Object.keys(kurang).length ? ' Data kurang (tanda “–”, kurang dari 3 tahun dengan tiga bulan lengkap berturut-turut) pada sebagian/seluruh musim: ' + Object.keys(kurang).join(', ') + '.' : '') + '</p>';
   }
 
+  /* ================= HOMOGENITAS DATA BBWS ================= */
+  function posStat(id) {
+    const ys = A[id].years, out = [];
+    Object.keys(ys).map(Number).sort((a, b) => a - b).forEach(y => {
+      const v = ys[y].filter(r => r && r.pos_rata != null && r.pos_rata > 0);
+      if (v.length) out.push({ y: y, pos: mean(v.map(r => r.pos_rata)), n: v.length, lengkap: ys[y].filter(r => r && r.lengkap).length });
+    });
+    return out;
+  }
+  function infoK(id) {
+    const ys = A[id].years, st = posStat(id);
+    if (!st.length) return null;
+    let z0 = Infinity, z1 = -Infinity, lengkap = 0;
+    Object.keys(ys).forEach(y => ys[y].forEach((r, i) => { if (!r) return; const z = +y * 12 + i; z0 = Math.min(z0, z); z1 = Math.max(z1, z); if (r.lengkap) lengkap++; }));
+    return { st: st, areal: isArealK(id), z0: z0, z1: z1, lengkap: lengkap, span: z1 - z0 + 1, pakai: A[id].rain.filter(t => okPos(id, t)).length, total: A[id].rain.length };
+  }
+  function htmlHomogen() {
+    const bln = z => ABR[z % 12] + ' ' + Math.floor(z / 12);
+    const info = KAB.map(k => ({ k: k, i: infoK(k.id) }));
+    const nAreal = info.filter(o => o.i && o.i.areal).length, nSt = info.filter(o => o.i && !o.i.areal).length;
+    const rows = info.map(o => {
+      const i = o.i, k = o.k;
+      if (!i) return '<tr><td>' + k.nm + '</td><td colspan="7" class="na">belum ada data</td></tr>';
+      const pct = i.lengkap / i.span * 100, pf = mean(i.st.slice(0, 3).map(x => x.pos)), pl = mean(i.st.slice(-3).map(x => x.pos));
+      return '<tr><td><b>' + k.nm + '</b></td><td>' + (i.areal ? 'Areal (pos = 1)' : 'Stasiun') + '</td><td>' + bln(i.z0) + '</td><td>' + bln(i.z1) + '</td><td>' + i.lengkap + ' / ' + i.span +
+        '</td><td' + (pct < 80 ? ' style="color:var(--warm);font-weight:700"' : '') + '>' + fmt(pct, 0) + '%</td><td>' + (i.areal ? '–' : fmt(pf, 1) + ' → ' + fmt(pl, 1)) + '</td><td>' + (i.areal ? '–' : fmt(.5 * pl, 1)) + '</td></tr>';
+    }).join('');
+    let ctrl = '', per = '';
+    if (nSt) {
+      ctrl = '<p style="margin:10px 0 0"><label>Pos aktif minimum untuk data latih (hanya kabupaten berjenis Stasiun): <input type="number" id="pos-min" min="0" step="0.5" value="' + C.POS_MIN + '" style="max-width:90px"></label> ' +
+        '<span class="note">0 = pakai semua data. “Saran” = setengah dari rata-rata pos terkini.</span></p>';
+      const ik = infoK(kab);
+      if (ik && !ik.areal) per = '<details style="margin-top:10px"><summary>Rincian per tahun · ' + nmKab() + '</summary><div class="tw"><table id="tbl-homog-th"><thead><tr><th>Tahun</th><th>Pos rata-rata</th><th>Bulan lengkap</th><th>Dipakai</th></tr></thead><tbody>' +
+        ik.st.map(x => '<tr><td>' + x.y + '</td><td>' + fmt(x.pos, 1) + '</td><td>' + x.lengkap + ' / 12</td><td>' + (C.POS_MIN > 0 && x.pos < C.POS_MIN ? '<span class="na">dikeluarkan</span>' : '✓') + '</td></tr>').join('') + '</tbody></table></div></details>';
+    }
+    return '<h2>Kualitas dan cakupan data latih</h2>' +
+      '<p class="note" style="margin:0 0 8px">Jenis data dikenali dari jumlah pos: <b>Areal</b> = jumlah pos selalu 1 (nilai rata-rata wilayah/grid, mis. dari GEE; tidak ada ketidakhomogenan akibat penambahan pos), ' +
+      '<b>Stasiun</b> = rata-rata beberapa pos telemetri. Saat ini: ' + nAreal + ' kabupaten areal, ' + nSt + ' kabupaten stasiun. Kelengkapan = bulan lengkap ÷ rentang bulan sejak data pertama (merah bila &lt; 80%); bulan yang tidak lengkap tidak bisa dipakai sebagai data latih.</p>' +
+      '<div class="tw"><table id="tbl-homog"><thead><tr><th>Kabupaten</th><th>Jenis data</th><th>Mulai</th><th>Terakhir</th><th>Bulan lengkap / rentang</th><th>Kelengkapan</th><th>Pos rata-rata awal → kini</th><th>Saran pos minimum</th></tr></thead><tbody>' + rows + '</tbody></table></div>' + ctrl + per;
+  }
+
   function pasca2() {
     if (mode !== 'proy') return;
     document.querySelectorAll('#tbl-proyeksi thead th').forEach(th => { if (th.textContent.trim() === 'n / t') th.textContent = 'n / skill'; });
@@ -486,6 +541,9 @@
     if (cards[1]) { const th = tahunan(kab), s = cards[1].querySelector('.s'); if (s && th.lo != null) s.textContent += ' · P10–P90 ' + fmt(th.lo, 0) + '–' + fmt(th.hi, 0) + ' mm'; }
     $('pnt').textContent = '† = Baseline (tanpa koreksi prediktor): tidak ada kombinasi ENSO/IOD/MJO/Kelvin/Rossby yang menurunkan galat leave-one-year-out ≥ ' +
       Math.round(C.MARGIN * 100) + '%, atau data < ' + MIN_N + ' tahun. Kategori memakai tercile klimatologi: Bawah/Atas Normal hanya bila peluangnya ≥ 40%.';
+    let bh = $('box-homog');
+    if (!bh) { bh = document.createElement('section'); bh.className = 'box'; bh.id = 'box-homog'; $('vp').appendChild(bh); }
+    bh.innerHTML = htmlHomogen();
     let bs = $('box-seas');
     if (!bs) { bs = document.createElement('section'); bs.className = 'box'; bs.id = 'box-seas'; $('vp').appendChild(bs); }
     bs.innerHTML = htmlMusim();
@@ -508,7 +566,13 @@
     resetFit();
     if (!$('app').hidden && tahun != null) render();
   }
-  window.PREDIKTOR = { C: C, musim: musim, htmlMusim: htmlMusim, WIN: WIN, nilai1: nilai1, serie: serie, fit2: fit2, annual: annual, kontribusi: kontribusi, setIdx: d => { IDX = d; iodC = null; resetFit(); }, htmlKotak: htmlKotak };
+  document.addEventListener('change', e => {
+    if (!e.target || e.target.id !== 'pos-min') return;
+    const v = parseFloat(e.target.value);
+    C.POS_MIN = isFinite(v) && v > 0 ? v : 0; tulisLS('ch_posmin_v1', C.POS_MIN);
+    resetFit(); render();
+  });
+  window.PREDIKTOR = { htmlHomogen: htmlHomogen, C: C, musim: musim, htmlMusim: htmlMusim, WIN: WIN, nilai1: nilai1, serie: serie, fit2: fit2, annual: annual, kontribusi: kontribusi, setIdx: d => { IDX = d; iodC = null; resetFit(); }, htmlKotak: htmlKotak };
   muatIdx();
   if (typeof RAW !== 'undefined' && RAW && Object.keys(RAW).length && tahun != null) { resetFit(); render(); }
 })();
