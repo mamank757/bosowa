@@ -114,24 +114,37 @@ def open_one(url, engine=None):
     return xr.open_dataset(url, **kw)
 
 
-def open_dataset(urls, max_age_days):
-    last_err = None
+def _short(e):
+    t = str(e).strip().splitlines()
+    return (t[0] if t else repr(e))[:180]
+
+
+def open_dataset(urls, max_age_days, retries=6, wait=20.0):
+    """Buka sumber OLR. Gangguan server (502/timeout) umumnya sementara, jadi dicoba ulang
+    dengan jeda bertahap. Hanya engine netcdf4 (pydap menafsirkan halaman error HTML sebagai data)."""
+    rangkum = []
     for url in urls:
-        for engine in ("netcdf4", "pydap", None):
+        for k in range(retries):
             try:
-                ds = open_one(url, engine)
+                ds = open_one(url, "netcdf4")
                 tn = "time" if "time" in ds.coords else next(c for c in ds.coords if "time" in c.lower())
                 t_last = pd.Timestamp(ds[tn].values[-1])
                 age = (pd.Timestamp.now("UTC").tz_localize(None) - t_last).days
                 if age > max_age_days:
                     warn(f"{url}: data terakhir {t_last.date()} ({age} hari lalu), dilewati.")
+                    rangkum.append(f"{url}: basi ({age} hari)")
                     ds.close()
                     break
-                info(f"Sumber OLR: {url} (engine={engine or 'auto'}) | data terakhir {t_last.date()}")
-                return ds, url, engine
+                info(f"Sumber OLR: {url} | data terakhir {t_last.date()}")
+                return ds, url, "netcdf4"
             except Exception as e:  # noqa: BLE001
-                last_err = f"{url} [{engine}]: {e}"
-    raise RuntimeError(f"Tidak ada sumber OLR yang bisa dibuka/segar. Galat terakhir: {last_err}")
+                msg = _short(e)
+                info(f"  buka {url.split('/')[-1]} gagal (percobaan {k + 1}/{retries}): {msg}")
+                if k == retries - 1:
+                    rangkum.append(f"{url}: {msg}")
+                else:
+                    time.sleep(wait * (k + 1))
+    raise RuntimeError("Tidak ada sumber OLR yang bisa dibuka/segar. " + " || ".join(rangkum))
 
 
 def names(ds):
@@ -166,8 +179,8 @@ def load_chunk(ds, names_, i0, i1, lat_slice, lon_idx, pairs_local, retries=4):
             parts = [np.nanmean(np.stack([blk[:, a, :], blk[:, b, :]]), axis=0) for a, b in pairs_local]
             return np.nanmean(np.stack(parts), axis=0)      # (t, lon)
         except Exception as e:  # noqa: BLE001
-            info(f"  percobaan {k + 1}/{retries} gagal: {e}")
-            time.sleep(5 * (k + 1))
+            info(f"  unduh blok gagal (percobaan {k + 1}/{retries}): {_short(e)}")
+            time.sleep(10 * (k + 1))
     raise RuntimeError(f"Gagal mengunduh blok waktu {i0}:{i1}")
 
 
@@ -175,7 +188,16 @@ def _worker(job):
     """Dijalankan di proses terpisah: buka dataset sendiri (netCDF4 tidak aman lintas-proses/thread)."""
     url, engine, names_, a, b, lat_slice, lon_idx, pairs = job
     t0 = time.time()
-    ds = open_one(url, engine)
+    ds = None
+    for k in range(4):
+        try:
+            ds = open_one(url, engine)
+            break
+        except Exception as e:  # noqa: BLE001
+            info(f"  buka dataset gagal (percobaan {k + 1}/4): {_short(e)}")
+            if k == 3:
+                raise
+            time.sleep(15 * (k + 1))
     try:
         z = load_chunk(ds, names_, a, b, lat_slice, lon_idx, pairs)
     finally:
@@ -287,13 +309,15 @@ def main():
     ap.add_argument("--trim-end", type=int, default=7, help="buang N hari terakhir (efek ujung deret)")
     ap.add_argument("--refetch-days", type=int, default=30, help="unduh ulang N hari terakhir dari cache")
     ap.add_argument("--max-age-days", type=int, default=20, help="tolak sumber yang datanya lebih tua dari ini")
-    ap.add_argument("--workers", type=int, default=4, help="jumlah proses unduh paralel")
+    ap.add_argument("--workers", type=int, default=3, help="jumlah proses unduh paralel")
     ap.add_argument("--max-minutes", type=float, default=100, help="batas waktu unduh; bila habis, cache disimpan dan keluar tanpa menulis CSV")
+    ap.add_argument("--open-retries", type=int, default=6, help="percobaan membuka sumber (jeda 20,40,60.. dtk)")
+    ap.add_argument("--open-wait", type=float, default=20.0)
     ap.add_argument("--cache", default=".cache/olr_strip.npz")
     ap.add_argument("--out-dir", default="data/waves")
     a = ap.parse_args()
 
-    ds, url, engine = open_dataset(a.url or DEFAULT_URLS, a.max_age_days)
+    ds, url, engine = open_dataset(a.url or DEFAULT_URLS, a.max_age_days, a.open_retries, a.open_wait)
     d_all, z_all, lon_sel, lengkap = build_series(ds, a, url, engine)
     ds.close()
     if not lengkap:
