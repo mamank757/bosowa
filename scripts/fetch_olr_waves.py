@@ -84,7 +84,7 @@ def anomalies(z, dates):
     df = pd.DataFrame(z, index=dates).interpolate(limit=15, limit_area="inside")
     df = df.fillna(df.mean())
     v = df.values.astype(np.float64)
-    d = (dates.dayofyear.values - 1) / 365.25
+    d = (dates.day_of_year.values - 1) / 365.25
     cols = [np.ones_like(d)]
     for k in (1, 2, 3):
         cols += [np.cos(2 * np.pi * k * d), np.sin(2 * np.pi * k * d)]
