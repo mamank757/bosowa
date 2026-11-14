@@ -28,7 +28,12 @@ import urllib.request
 import numpy as np
 import pandas as pd
 
-DMI_URL = "https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data"
+DMI_SOURCES = [   # (label, url, jenis, nama berkas cache). Urutan = prioritas.
+    ("NOAA CPC DMI (ERSSTv6, klimatologi 1991-2020)",
+     "https://www.cpc.ncep.noaa.gov/products/international/ocean_monitoring/indian/IODMI/mnth.ersstv6.clim19912020.dmi_current.txt",
+     "cpc", "dmi_cpc.raw.txt"),
+    ("NOAA PSL DMI (HadISST1.1)", "https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/dmi.had.long.data", "psl", "dmi_psl.raw.txt"),
+]
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 MJO_GROUPS = {"mc": [4, 5], "ioc": [2, 3], "wp": [6, 7], "wh": [8, 1]}
@@ -63,30 +68,59 @@ def parse_dmi(text):
     return out
 
 
-def load_dmi(raw_path):
-    text = None
-    for attempt in range(3):
+def parse_dmi_cpc(text):
+    """CPC: baris 'Tahun Bulan WTIO SETIO DMI'. Baris DMI divalidasi: DMI = WTIO - SETIO."""
+    out = {}
+    for line in text.splitlines():
+        p = line.split()
+        if len(p) != 5:
+            continue
         try:
-            req = urllib.request.Request(DMI_URL, headers={"User-Agent": UA})
+            y, m = int(p[0]), int(p[1])
+            w, st, d = float(p[2]), float(p[3]), float(p[4])
+        except ValueError:
+            continue
+        if 1800 < y < 2200 and 1 <= m <= 12 and abs(d) < 50 and abs((w - st) - d) < 0.05:
+            out[f"{y}-{m}"] = round(d, 3)
+    return out
+
+
+def _download(url, tries=3):
+    last = None
+    for k in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=60) as r:
-                text = r.read().decode("utf-8", "replace")
-            if len(parse_dmi(text)) < 500:
-                raise ValueError("format DMI tidak dikenali")
-            os.makedirs(os.path.dirname(raw_path), exist_ok=True)
-            with open(raw_path, "w", encoding="utf-8") as f:
-                f.write(text)
-            break
+                return r.read().decode("utf-8", "replace")
         except Exception as e:  # noqa: BLE001
-            info(f"Unduh DMI gagal (percobaan {attempt + 1}): {e}")
-            text = None
+            last = e
+            info(f"Unduh gagal ({url.split('/')[-1]}, percobaan {k + 1}): {e}")
             time.sleep(5)
-    if text is None and os.path.exists(raw_path):
-        warn("DMI: memakai salinan lama (unduhan gagal).")
-        text = open(raw_path, encoding="utf-8").read()
-    if text is None:
-        return None
-    d = parse_dmi(text)
-    return d or None
+    raise RuntimeError(str(last))
+
+
+def load_dmi(raw_dir):
+    """Urutan: CPC segar -> cache CPC -> PSL segar -> cache PSL. Mengembalikan (deret, label)."""
+    parsers = {"cpc": parse_dmi_cpc, "psl": parse_dmi}
+    for label, url, kind, fname in DMI_SOURCES:
+        path = os.path.join(raw_dir, fname)
+        try:
+            txt = _download(url)
+            d = parsers[kind](txt)
+            if len(d) < 500:
+                raise ValueError("format DMI tidak dikenali")
+            os.makedirs(raw_dir, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(txt)
+            return d, label
+        except Exception as e:  # noqa: BLE001
+            info(f"DMI {kind.upper()} segar gagal: {e}")
+        if os.path.exists(path):
+            d = parsers[kind](open(path, encoding="utf-8").read())
+            if len(d) >= 500:
+                warn(f"DMI: memakai salinan lama {fname} (unduhan gagal).")
+                return d, label + " [salinan lama]"
+    return None, None
 
 
 # ----------------------------------------------------------------- MJO (RMM)
@@ -259,20 +293,30 @@ def main():
     ap.add_argument("--kelvin", default=None)
     ap.add_argument("--rossby", default=None)
     ap.add_argument("--wave-stat", default="std", choices=["std", "mean", "absmean"])
-    ap.add_argument("--dmi-raw", default="data/indices/dmi.raw.txt")
+    ap.add_argument("--dmi-dir", default="data/indices", help="folder cache berkas mentah DMI")
+    ap.add_argument("--rmm-url", default=None, help="cadangan: unduh rmm.txt dari URL ini bila berkas lokal tidak ada")
     ap.add_argument("--since", type=int, default=1990)
     ap.add_argument("--out", default="data/indices/monthly.json")
     a = ap.parse_args()
 
     out = {"generated": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "days": {}}
 
-    dmi = load_dmi(a.dmi_raw)
+    dmi, dmi_label = load_dmi(a.dmi_dir)
     if dmi:
         out["dmi"] = trim(dmi, a.since)
-        out["dmi_source"] = "NOAA PSL dmi.had.long.data (HadISST1.1)"
-        info(f"DMI: {span(out['dmi'])}")
+        out["dmi_source"] = dmi_label
+        info(f"DMI [{dmi_label}]: {span(out['dmi'])}")
     else:
         warn("DMI tidak tersedia.")
+
+    if not os.path.exists(a.rmm) and a.rmm_url:
+        try:
+            os.makedirs(os.path.dirname(a.rmm) or ".", exist_ok=True)
+            with open(a.rmm, "w", encoding="utf-8") as f:
+                f.write(_download(a.rmm_url))
+            info(f"RMM: {a.rmm} tidak ada, diunduh dari {a.rmm_url}")
+        except Exception as e:  # noqa: BLE001
+            warn(f"RMM: unduhan cadangan gagal: {e}")
 
     if os.path.exists(a.rmm):
         d = parse_rmm(a.rmm)
