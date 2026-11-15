@@ -242,25 +242,39 @@
     const pn = Math.max(0, 1 - pb - pa);
     return { pb: pb, pn: pn, pa: pa, cat: pb >= .4 && pb >= pa ? 'bn' : pa >= .4 ? 'an' : 'n' };
   }
-  compute = function (id, list, ev) {
-    const map = lagMap(), imap = iodMap();
-    return list.map((m, i) => {
-      const f = fit2(id, m.mo), e = ev[i];
-      if (!f) return { m: m, e: e, none: true };
-      const lead = Math.max(0, m.y * 12 + m.mo - 1 - NOWZ), Nm = f.mean;
-      const capped = f.ok && lead > C.MONTHLY_MAX_LEAD, pakai = f.ok && !capped;   // lead panjang: prediktor lag 1-3 bln belum teramati
-      let F = 1, z = [];
-      if (pakai) {
-        z = zTarget(f, m, lead, e, map, imap);
-        let eta = f.a; f.beta.forEach((b, q) => { eta += b * z[q]; });
-        F = clamp(Math.exp(eta) / Nm, F_LO, F_HI);
-      }
-      const mu = Nm * F, cv0 = f.cv0, cvF = pakai ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2)) : cv0;
-      const ds = dist(mu, cvF), pl = peluang(Nm, cv0, ds);
-      return { m: m, e: e, F: F, n: f.n, t: f.t, fitOK: pakai, capped: capped, Nm: Nm, mean: mu, p10: ds.p10, p90: ds.p90, pb: pl.pb, pn: pl.pn, pa: pl.pa, cat: pl.cat, z: z };
-    });
-  };
-
+  function faktorMusim(id, m) {
+  const z = m.y * 12 + m.mo - 1, v = [];
+  for (let d = 0; d <= 2; d++) {                 // 3 periode yang memuat bulan ini
+    const zs = z - d;
+    if (zs - NOWZ < 1) continue;                 // periode harus dimulai di masa depan
+    const x = musim(id, zMo(zs));
+    if (!x.none && x.f.ok) v.push({ F: x.mean / x.Nm, sk: x.f.msess });
+  }
+  return v.length ? { F: mean(v.map(o => o.F)), sk: mean(v.map(o => o.sk)) } : null;
+}
+compute = function (id, list, ev) {
+  const map = lagMap(), imap = iodMap();
+  return list.map((m, i) => {
+    const f = fit2(id, m.mo), e = ev[i];
+    if (!f) return { m: m, e: e, none: true };
+    const lead = Math.max(0, m.y * 12 + m.mo - 1 - NOWZ), Nm = f.mean;
+    const capped = f.ok && lead > C.MONTHLY_MAX_LEAD, pakai = f.ok && !capped;
+    let F = 1, z = [], s3 = null;
+    if (pakai) {
+      z = zTarget(f, m, lead, e, map, imap);
+      let eta = f.a; f.beta.forEach((b, q) => { eta += b * z[q]; });
+      F = clamp(Math.exp(eta) / Nm, F_LO, F_HI);
+    } else if ((s3 = faktorMusim(id, m))) {
+      F = clamp(s3.F, F_LO, F_HI);               // faktor dari model 3 bulanan
+    }
+    const mu = Nm * F, cv0 = f.cv0;
+    const cvF = pakai ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2))
+              : s3 ? Math.max(.2, cv0 * Math.sqrt(Math.max(.3, 1 - s3.sk))) : cv0;
+    const ds = dist(mu, cvF), pl = peluang(Nm, cv0, ds);
+    return { m: m, e: e, F: F, n: f.n, t: f.t, fitOK: pakai || !!s3, src: s3 ? '3bln' : null, sk3: s3 ? s3.sk : null,
+      capped: capped, Nm: Nm, mean: mu, p10: ds.p10, p90: ds.p90, pb: pl.pb, pn: pl.pn, pa: pl.pa, cat: pl.cat, z: z };
+  });
+};
   /* Kontribusi berurutan (mm): Baseline + dENSO + dIOD + dMJO + dKelvin + dRossby = Prediksi.
      Urutan memengaruhi pembagian karena model berbentuk perkalian; hasil dinormalkan agar jumlahnya pas. */
   function kontribusi(x, f) {
