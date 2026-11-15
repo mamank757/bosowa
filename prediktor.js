@@ -221,8 +221,15 @@
       const d = a.map((v, i) => v - b[i]), m = mean(d), s = Math.sqrt(sum(d.map(x => (x - m) ** 2)) / (n - 1));
       return mean(b) < mean(a) * (1 - C.MARGIN) && m > 0 && m / Math.max(1e-12, s / Math.sqrt(n)) >= C.ZSEL;
     };
+    /* Kandidat asimetri (ENSO + El Niño⁺) harus mengalahkan model ENSO LINEAR, bukan hanya Baseline.
+       Tanpa syarat ini ia menjadi "kesempatan kedua" melewati uji signifikansi bagi kombinasi yang
+       ENSO linearnya sedikit di bawah ambang, padahal tambahan skill dari asimetri hanya 0,01-0,02. */
+    const iE = chain.findIndex(S => S.length === 1 && S[0] === 0);   // indeks model ENSO linear (-1 bila tidak ada)
     let best = 0;
-    for (let k = 1; k < chain.length; k++) if (lebihBaik(sq[best], sq[k])) best = k;
+    for (let k = 1; k < chain.length; k++) {
+      if (chain[k].indexOf(ASY) > -1 && iE > 0 && !lebihBaik(sq[iE], sq[k])) continue;
+      if (lebihBaik(sq[best], sq[k])) best = k;
+    }
     F.abl = chain.map((S, k) => ({ set: S.map(j => PRED[j].id), msess: mseC > 0 ? 1 - mses[k] / mseC : 0, sel: k === best }));
     if (best > 0) {
       const S = chain[best], P = prep(all, S, raw), b = irls(P.X, y, C.LAMBDA, null, 40);
