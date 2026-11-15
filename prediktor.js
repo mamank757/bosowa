@@ -372,26 +372,27 @@
     const pv = prevZ(m.y, m.mo, 1), k = pv.y + '-' + pv.mo;
     return WAVES.map(w => {
       const S = serie(w); if (!S) return null;
-      const v = nilai1(S, pv.y, pv.mo, true);
-      return v === null ? null : { v: v, n: S.d ? S.d[k] : null };
+      return { v: nilai1(S, pv.y, pv.mo, true), n: S.d ? S.d[k] : null };   // v = null bila hari data < MIN_DAYS_NOW
     });
   }
   function pendek(id) {
     const m = MONTHS[0], lead = m.y * 12 + m.mo - 1 - NOWZ;
-    const fw = fit2(id, m.mo, 'W'), fd = fit2(id, m.mo);
-    if (!fw || !fd) return { none: true };
+    const fw = fit2(id, m.mo, 'W');
+    if (!fw) return { none: true };
     const map = lagMap(), imap = iodMap(), e = ensoAutoFor([m])[0].v;
-    const hit = f => {
-      if (!f.ok) return { mu: f.mean, z: [] };
-      const z = zTarget(f, m, lead, e, map, imap);
-      let eta = f.a; f.beta.forEach((b, q) => { eta += b * z[q]; });
-      return { mu: f.mean * clamp(Math.exp(eta) / f.mean, F_LO, F_HI), z: z };
-    };
-    const d = hit(fd), w = hit(fw), gn = gelNow(m);
+    const cu = compute(id, [m], [e])[0];              // angka yang persis sama dengan dashboard utama (termasuk model 3 bulanan)
+    if (cu.none) return { none: true };
+    const gn = gelNow(m);
     const gel = fw.ok && fw.idxS.some(j => j >= 2);   // rantai memilih minimal satu gelombang
-    const kosong = fw.ok ? fw.idxS.filter(j => j >= 2 && gn[j - 2] === null).map(j => PRED[j].nm) : [];
-    const dl = gel ? kontribusi({ z: w.z, Nm: fw.mean, mean: w.mu, capped: false }, fw) : null;
-    return { m: m, Nm: fw.mean, d: d.mu, w: w.mu, gel: gel, dl: dl, fw: fw, kosong: kosong };
+    let w = cu.mean, dl = null;                       // tanpa gelombang: sama dengan dashboard utama
+    if (gel) {
+      const z = zTarget(fw, m, lead, e, map, imap);
+      let eta = fw.a; fw.beta.forEach((b, q) => { eta += b * z[q]; });
+      w = fw.mean * clamp(Math.exp(eta) / fw.mean, F_LO, F_HI);
+      dl = kontribusi({ z: z, Nm: fw.mean, mean: w, capped: false }, fw);
+    }
+    const kosong = gel ? fw.idxS.filter(j => j >= 2 && (!gn[j - 2] || gn[j - 2].v === null)).map(j => PRED[j].nm) : [];
+    return { m: m, Nm: cu.Nm, d: cu.mean, w: w, gel: gel, dl: dl, fw: fw, kosong: kosong };
   }
 
   /* ================= TAHUNAN ================= */
@@ -551,7 +552,8 @@
   /* Kotak jangka pendek: bulan depan dengan koreksi MJO / Kelvin / Rossby (terpisah dari dashboard utama) */
   function htmlPendek() {
     const m = MONTHS[0], pv = prevZ(m.y, m.mo, 1), gn = gelNow(m), GE = PRED.slice(2);
-    const nilaiTxt = WAVES.map((w, q) => GE[q].nm + ' ' + (gn[q] ? fmt(gn[q].v, 2) + (gn[q].n != null ? ' (' + gn[q].n + ' hari)' : '') : 'belum tersedia')).join(' · ');
+    const nilaiTxt = WAVES.map((w, q) => GE[q].nm + ' ' + (gn[q] && gn[q].v !== null ? fmt(gn[q].v, 2) + (gn[q].n != null ? ' (' + gn[q].n + ' hari)' : '')
+      : gn[q] && gn[q].n != null ? 'belum cukup data (' + gn[q].n + ' hari, minimal ' + C.MIN_DAYS_NOW + ')' : 'belum tersedia')).join(' · ');
     let nGel = 0, nAll = 0;
     const rows = KAB.map(k => {
       const x = pendek(k.id), nm = k.id === kab ? '<b>' + k.nm + ' ◂</b>' : k.nm;
@@ -563,7 +565,7 @@
         if (x.dl && x.dl[j] !== undefined) return '<td style="color:' + (x.dl[j] < 0 ? 'var(--c1)' : 'var(--c2)') + '">' + sgm(x.dl[j]) + '</td>';
         return '<td class="na" title="' + p.nm + ': tidak lolos validasi LOYO">–</td>';
       }).join('');
-      const model = x.gel ? x.fw.model : x.fw.ok ? 'Tanpa gelombang (' + x.fw.model + ')' : 'Baseline';
+      const model = x.gel ? x.fw.model : 'Tanpa gelombang';
       const peringatan = x.kosong.length ? '<span class="ps">⚠ ' + x.kosong.join(', ') + ' bulan ' + ABR[pv.mo - 1] + ' belum tersedia → dianggap netral</span>' : '';
       return '<tr><td>' + nm + '</td><td>' + fmt(x.Nm, 0) + '</td><td>' + fmt(x.d, 0) + '</td><td><b>' + fmt(x.w, 0) + '</b></td><td>' +
         (x.gel ? sgm(sel) : '–') + '</td>' + cells + '<td class="na">' + model + peringatan + '</td><td>' + (x.gel ? sg2(x.fw.msess) : '–') + '</td></tr>';
@@ -576,7 +578,7 @@
       '<div class="tw"><table id="tbl-pendek"><thead><tr><th>Kabupaten</th><th>Baseline</th><th>Dashboard utama (ENSO/IOD)</th><th>Dengan gelombang</th><th>Selisih</th>' +
       GE.map(p => '<th>Δ ' + p.nm + '</th>').join('') + '<th>Model terpilih</th><th>Skill (MSESS)</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<p class="note">Satuan mm. Gelombang masuk hanya bila menurunkan galat LOYO ≥ ' + Math.round(C.MARGIN * 100) + '% dan signifikan <i>di atas</i> model ENSO+IOD; selain itu kolom “Dengan gelombang” sama dengan dashboard utama. ' +
-      'Gelombang dipilih pada ' + nGel + ' dari ' + nAll + ' kabupaten. ' +
+      'Gelombang dipilih pada ' + nGel + ' dari ' + nAll + ' kabupaten' + (nGel === 0 ? ': tidak ada bukti bahwa gelombang memperbaiki prakiraan bulan ini, jadi seluruh angka sama dengan dashboard utama' : '') + '. ' +
       '<b>Perlakukan sebagai indikasi eksperimental, bukan prakiraan terverifikasi:</b> indeks gelombang bulanan adalah ringkasan kasar proses yang berskala mingguan, sehingga dasar fisiknya lemah pada resolusi bulanan. ' +
       'Skill dipilih dan dinilai dari data yang sama (optimistis), dan kabupaten yang berdekatan saling berkorelasi, jadi banyak kabupaten yang “lolos” bukan berarti banyak konfirmasi independen. ' +
       'Skill Kelvin yang melonjak di bulan tertentu pada banyak kabupaten sekaligus patut dicurigai.</p>';
