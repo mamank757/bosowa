@@ -444,7 +444,7 @@ compute = function (id, list, ev) {
       '<th>Prediksi</th><th>Model terpilih</th><th>Skill (MSESS)</th></tr></thead><tbody>' + rows + '</tbody><tfoot>' + foot + '</tfoot></table></div>' +
       '<p class="note">Satuan mm. Δ = kontribusi berurutan (ENSO → IOD → MJO → Kelvin → Rossby), dinormalkan sehingga Baseline + ΣΔ = Prediksi. “–” = prediktor tidak dipakai di bulan itu. ' +
       'Skill = 1 − MSE/MSE-klimatologi pada validasi leave-one-year-out; model hanya dipakai bila menurunkan galat ≥ ' + Math.round(C.MARGIN * 100) + '%. ' +
-      'Bulan dengan lead > ' + C.MONTHLY_MAX_LEAD + ' bln otomatis memakai Baseline (lihat tabel 3 bulanan di atas). Model tervalidasi dipakai pada ' + PRED.map((p, j) => p.nm + ' ' + pakai[j]).join(', ') + ' dari ' + nm + ' kombinasi kabupaten-bulan. ' +
+      'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai ENSO prakiraan statistik, bukan ENSO teramati; skill bertanda * hanya berlaku bila prakiraan itu tepat, dan rentang P10–P90 dibuat selebar klimatologi. Model tervalidasi dipakai pada ' + PRED.map((p, j) => p.nm + ' ' + pakai[j]).join(', ') + ' dari ' + nm + ' kombinasi kabupaten-bulan. ' +
       'MJO/Kelvin/Rossby memakai lag 1 bulan, sehingga hanya memengaruhi bulan terdekat; bulan lebih jauh dianggap netral.</p>' +
       '<h2 style="margin-top:18px">Prediksi tahunan semua kabupaten</h2>' +
       '<div class="tw"><table id="tbl-ann"><thead><tr><th>Kabupaten</th><th>Normal ' + REPORT_YEAR + '</th><th>Prediksi ' + REPORT_YEAR + '</th><th>P10–P90</th><th>% normal</th>' +
@@ -548,7 +548,7 @@ compute = function (id, list, ev) {
     if (mode !== 'proy') return;
     document.querySelectorAll('#tbl-proyeksi thead th').forEach(th => { if (th.textContent.trim() === 'n / t') th.textContent = 'n / skill'; });
     const ths = document.querySelectorAll('#tsr thead th'); if (ths[6]) ths[6].textContent = 'Bulan bermodel prediktor';
-    document.querySelectorAll('#tpm sup').forEach(s => { s.title = 'Model Baseline: prediktor tidak mengalahkan klimatologi (LOYO), data < ' + MIN_N + ' tahun, atau lead > ' + C.MONTHLY_MAX_LEAD + ' bulan'; });
+    document.querySelectorAll('#tpm sup').forEach(s => { s.title = 'Model Baseline: tidak ada prediktor yang mengalahkan klimatologi (LOYO), atau data < ' + MIN_N + ' tahun'; });
     const psm = $('psm'); if (psm) psm.textContent += ' Prediktor tambahan: ' + statusIdx() + '.';
     document.querySelectorAll('#tpm tr').forEach((tr, i) => {
       const x = PM[i], c = tr.querySelector('span.cat');
