@@ -34,7 +34,8 @@
     MIN_DAYS: 20,       // bulan harian dianggap lengkap bila >= 20 hari
     MIN_DAYS_NOW: 10,   // bulan berjalan boleh dipakai bila >= 10 hari
     MIN_COVER: 0.6,     // prediktor dipakai bila tersedia pada >= 60% tahun latih
-    MONTHLY_MAX_LEAD: 3, // model BULANAN (lag 1-3 bulan) hanya dipakai sampai lead ini; sesudahnya Baseline (pakai tabel 3 bulanan)
+     MONTHLY_MAX_LEAD: 12, // model BULANAN dipakai sampai lead ini; lead > CV_LEAD memakai ENSO prakiraan (bukan teramati)
+    CV_LEAD: 3,           // lead > ini: rentang ketidakpastian dibuat selebar klimatologi (tidak diperkecil oleh skill)
     SEAS_MAX_LAG: 36,    // prediktor 3 bulanan diabaikan bila data terakhirnya lebih tua dari ini (bulan)
     POS_MIN: 0           // bulan dengan rata-rata pos aktif < nilai ini tidak dipakai sebagai data latih (0 = pakai semua)
   };
@@ -268,8 +269,8 @@ compute = function (id, list, ev) {
       F = clamp(s3.F, F_LO, F_HI);               // faktor dari model 3 bulanan
     }
     const mu = Nm * F, cv0 = f.cv0;
-    const cvF = pakai ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2))
-              : s3 ? Math.max(.2, cv0 * Math.sqrt(Math.max(.3, 1 - s3.sk))) : cv0;
+          const cvF = pakai && lead <= C.CV_LEAD ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2))
+                : s3 ? Math.max(.2, cv0 * Math.sqrt(Math.max(.3, 1 - s3.sk))) : cv0;
     const ds = dist(mu, cvF), pl = peluang(Nm, cv0, ds);
     return { m: m, e: e, F: F, n: f.n, t: f.t, fitOK: pakai || !!s3, src: s3 ? '3bln' : null, sk3: s3 ? s3.sk : null,
       capped: capped, Nm: Nm, mean: mu, p10: ds.p10, p90: ds.p90, pb: pl.pb, pn: pl.pn, pa: pl.pa, cat: pl.cat, z: z };
@@ -415,8 +416,10 @@ compute = function (id, list, ev) {
         const alasan = x.capped ? 'lead terlalu panjang untuk model bulanan' : f.usable.indexOf(p.id) < 0 ? 'data belum tersedia' : 'tidak menurunkan galat LOYO';
         return '<td class="na" title="' + p.nm + ': ' + alasan + '">–</td>';
       }).join('');
-      return '<tr><td>' + bl(x.m) + '</td><td>' + fmt(x.Nm, 0) + '</td>' + cells + '<td><b>' + fmt(x.mean, 0) + '</b></td><td class="na">' +
-        (x.capped ? 'Baseline (lead > ' + C.MONTHLY_MAX_LEAD + ' bln)' : f.ok ? f.model : 'Baseline') + '</td><td>' + (f.ok && !x.capped ? sg2(f.msess) : '–') + '</td></tr>';
+            const jauh = x.m.y * 12 + x.m.mo - 1 - NOWZ > C.CV_LEAD;
+      const lbl = x.src ? 'Model 3 bulanan' : x.capped ? 'Baseline (lead > ' + C.MONTHLY_MAX_LEAD + ' bln)' : f.ok ? f.model + (jauh ? ' (ENSO prakiraan)' : '') : 'Baseline';
+      const skl = x.src ? sg2(x.sk3) : f.ok && !x.capped ? sg2(f.msess) + (jauh ? '*' : '') : '–';
+      return '<tr><td>' + bl(x.m) + '</td><td>' + fmt(x.Nm, 0) + '</td>' + cells + '<td><b>' + fmt(x.mean, 0) + '</b></td><td class="na">' + lbl + '</td><td>' + skl + '</td></tr>';
     }).join('');
     const foot = '<tr><td>Total 12 bln</td><td>' + fmt(tot.b, 0) + '</td>' + tot.d.map(v => '<td>' + (v ? sgm(v) : '–') + '</td>').join('') +
       '<td>' + fmt(tot.p, 0) + '</td><td colspan="2"></td></tr>';
