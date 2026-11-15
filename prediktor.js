@@ -42,7 +42,8 @@
     MIN_DAYS: 20,       // bulan harian dianggap lengkap bila >= 20 hari
     MIN_DAYS_NOW: 10,   // bulan berjalan boleh dipakai bila >= 10 hari
     MIN_COVER: 0.6,     // prediktor dipakai bila tersedia pada >= 60% tahun latih
-    MONTHLY_MAX_LEAD: 12, // model BULANAN dipakai sampai lead ini (12 = seluruh jendela proyeksi)
+    MONTHLY_MAX_LEAD: 3,  // model BULANAN dipakai sampai lead ini (backtest: tidak ada skill pada lead > 3; 12 = seluruh jendela)
+    SEAS_START_MAX: 1,    // model 3 BULANAN hanya dipakai untuk periode yang DIMULAI paling lambat N bulan lagi (backtest: hanya Des-Feb, lead 1, terbukti)
     CV_LEAD: 3,           // lead > ini: model ENSO-saja dengan ENSO prakiraan; rentang ketidakpastian = klimatologi
     SEAS_MAX_LAG: 36,    // prediktor 3 bulanan diabaikan bila data terakhirnya lebih tua dari ini (bulan)
     POS_MIN: 0           // bulan dengan rata-rata pos aktif < nilai ini tidak dipakai sebagai data latih (0 = pakai semua)
@@ -261,7 +262,7 @@
     const z = m.y * 12 + m.mo - 1, v = [];
     for (let d = 0; d <= 2; d++) {
       const zs = z - d;
-      if (zs - NOWZ < 1) continue;                 // periode harus dimulai di masa depan
+      if (zs - NOWZ < 1 || zs - NOWZ > C.SEAS_START_MAX) continue;   // periode harus dimulai di masa depan, dan tidak terlalu jauh
       const x = musim(id, zMo(zs));
       if (!x.none && x.f.ok) v.push({ F: x.mean / x.Nm, sk: x.f.msess });
     }
@@ -615,7 +616,9 @@
       '<th>Prediksi</th><th>Model terpilih</th><th>Skill (MSESS)</th></tr></thead><tbody>' + rows + '</tbody><tfoot>' + foot + '</tfoot></table></div>' +
       '<p class="note">Satuan mm. Δ = kontribusi berurutan (ENSO → IOD), dinormalkan sehingga Baseline + ΣΔ = Prediksi. “–” = prediktor tidak dipakai di bulan itu. ' +
       'Skill = 1 − MSE/MSE-klimatologi pada validasi leave-one-year-out; model hanya dipakai bila menurunkan galat ≥ ' + Math.round(C.MARGIN * 100) + '%. ' +
-      'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai ENSO prakiraan statistik dan hanya model ENSO (IOD belum teramati pada lead itu); skill bertanda * dihitung dengan ENSO teramati sehingga hanya berlaku bila prakiraan itu tepat, dan rentang P10–P90 dibuat selebar klimatologi.' + ensoNote +
+      (C.MONTHLY_MAX_LEAD > C.CV_LEAD
+        ? 'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai ENSO prakiraan statistik dan hanya model ENSO (IOD belum teramati pada lead itu); skill bertanda * dihitung dengan ENSO teramati sehingga hanya berlaku bila prakiraan itu tepat, dan rentang P10–P90 dibuat selebar klimatologi.' + ensoNote
+        : 'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai Baseline (klimatologi): backtest walk-forward tidak menunjukkan skill pada jarak itu.') +
       ' Model tervalidasi dipakai pada ' + PRED_UTAMA.map((p, j) => p.nm + ' ' + pakai[j]).join(', ') + ' dari ' + nm + ' kombinasi kabupaten-bulan. ' +
       'MJO, Kelvin, dan Rossby tidak dipakai di sini; lihat kotak jangka pendek (bulan depan) di bawah.</p>' +
       '<h2 style="margin-top:18px">Prediksi tahunan semua kabupaten</h2>' +
@@ -764,7 +767,8 @@
     if (cards[1]) { const th = tahunan(kab), s = cards[1].querySelector('.s'); if (s && th.lo != null) s.textContent += ' · P10–P90 ' + fmt(th.lo, 0) + '–' + fmt(th.hi, 0) + ' mm'; }
     $('pnt').textContent = '† = Baseline (tanpa koreksi prediktor): tidak ada kombinasi ENSO/IOD yang menurunkan galat leave-one-year-out ≥ ' +
       Math.round(C.MARGIN * 100) + '%, atau data < ' + MIN_N + ' tahun. Kategori memakai tercile klimatologi: Bawah/Atas Normal hanya bila peluangnya ≥ 40%. ' +
-      'Bulan berlead > ' + C.CV_LEAD + ' bln adalah skenario berbasis ENSO prakiraan statistik, bukan prakiraan terverifikasi.';
+      (C.MONTHLY_MAX_LEAD > C.CV_LEAD ? 'Bulan berlead > ' + C.CV_LEAD + ' bln adalah skenario berbasis ENSO prakiraan statistik, bukan prakiraan terverifikasi.'
+        : 'Bulan berlead > ' + C.CV_LEAD + ' bln = Baseline (tidak ada skill terbukti pada jarak itu).');
     let bh = $('box-homog');
     if (!bh) { bh = document.createElement('section'); bh.className = 'box'; bh.id = 'box-homog'; $('vp').appendChild(bh); }
     bh.innerHTML = htmlHomogen();
