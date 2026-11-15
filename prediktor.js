@@ -13,9 +13,17 @@
    4. Prediktor yang datanya belum ada di monthly.json otomatis dilewati.
    5. Prediksi tahunan = jumlah prediksi bulanan; ketidakpastiannya dari galat LOYO tahunan.
 
-   TIGA BULANAN (untuk 6-12 bulan ke depan): model dilatih per jarak prakiraan. Prediktor ENSO/IOD adalah
+   PROYEKSI 12 BULAN:
+   - Lead <= CV_LEAD (3 bln): model bulanan lengkap (semua prediktor yang lolos LOYO) dengan ENSO/IOD teramati.
+     Bila model bulanan tidak lolos, dipakai faktor dari model 3 bulanan (bila lolos).
+   - Lead > CV_LEAD: model ENSO-SAJA (prediktor lain tidak mungkin teramati pada lead itu; memasukkannya
+     sebagai nol akan menggeser intersep dan menghasilkan artefak). ENSO yang dipakai adalah prakiraan
+     statistik (fauto), diredam ATT. Rentang P10-P90 dan peluang dibuat selebar klimatologi,
+     karena skill LOYO dihitung dengan ENSO teramati, bukan prakiraan.
+
+   TIGA BULANAN (tabel terpisah): model dilatih per jarak prakiraan. Prediktor ENSO/IOD adalah
    rata-rata 3 bulan terakhir yang SUDAH teramati, dengan jeda yang sama persis pada data latih, sehingga
-   tidak ada ekstrapolasi ENSO. Model BULANAN (lag 1-3 bulan) hanya dipakai sampai MONTHLY_MAX_LEAD bulan.
+   tidak ada ekstrapolasi ENSO.
 
    Catatan penting: MJO/Kelvin/Rossby memakai lag 1 bulan. Untuk bulan yang prediktor
    lag-1 nya belum teramati, nilainya dianggap netral (tidak berpengaruh). */
@@ -34,8 +42,8 @@
     MIN_DAYS: 20,       // bulan harian dianggap lengkap bila >= 20 hari
     MIN_DAYS_NOW: 10,   // bulan berjalan boleh dipakai bila >= 10 hari
     MIN_COVER: 0.6,     // prediktor dipakai bila tersedia pada >= 60% tahun latih
-     MONTHLY_MAX_LEAD: 12, // model BULANAN dipakai sampai lead ini; lead > CV_LEAD memakai ENSO prakiraan (bukan teramati)
-    CV_LEAD: 3,           // lead > ini: rentang ketidakpastian dibuat selebar klimatologi (tidak diperkecil oleh skill)
+    MONTHLY_MAX_LEAD: 12, // model BULANAN dipakai sampai lead ini (12 = seluruh jendela proyeksi)
+    CV_LEAD: 3,           // lead > ini: model ENSO-saja dengan ENSO prakiraan; rentang ketidakpastian = klimatologi
     SEAS_MAX_LAG: 36,    // prediktor 3 bulanan diabaikan bila data terakhirnya lebih tua dari ini (bulan)
     POS_MIN: 0           // bulan dengan rata-rata pos aktif < nilai ini tidak dipakai sebagai data latih (0 = pakai semua)
   };
@@ -211,13 +219,14 @@
     }
     return F;
   }
-  /* model BULANAN: prediktor lag 1-3 bulan (ENSO/IOD) atau lag 1 bulan (MJO/Kelvin/Rossby) */
-  function fit2(id, mo) {
-    const cache = A[id].fit;
-    if (cache[mo] !== undefined) return cache[mo];
+  /* model BULANAN: prediktor lag 1-3 bulan (ENSO/IOD) atau lag 1 bulan (MJO/Kelvin/Rossby).
+     solo = true: hanya ENSO yang boleh masuk (dipakai untuk lead panjang, saat prediktor lain tidak teramati). */
+  function fit2(id, mo, solo) {
+    const cache = A[id].fit, ck = solo ? mo + 'E' : mo;
+    if (cache[ck] !== undefined) return cache[ck];
     const R = A[id].rain.filter(t => t.mo === mo && okPos(id, t));
     const raw = R.map(t => PRED.map(p => rawTrain(p, t.y, t.mo)));
-    return (cache[mo] = fitCore(R.map(t => t.y), R.map(t => t.mm), raw, PRED.map(() => true), .2));
+    return (cache[ck] = fitCore(R.map(t => t.y), R.map(t => t.mm), raw, PRED.map((p, j) => !solo || j === 0), .2));
   }
   fit = function (id, mo) { return fit2(id, mo); };   // satu cache untuk semua pemanggil
 
@@ -243,39 +252,43 @@
     const pn = Math.max(0, 1 - pb - pa);
     return { pb: pb, pn: pn, pa: pa, cat: pb >= .4 && pb >= pa ? 'bn' : pa >= .4 ? 'an' : 'n' };
   }
+  /* faktor dari model 3 bulanan (3 periode yang memuat bulan ini); dipakai bila model bulanan tidak lolos */
   function faktorMusim(id, m) {
-  const z = m.y * 12 + m.mo - 1, v = [];
-  for (let d = 0; d <= 2; d++) {                 // 3 periode yang memuat bulan ini
-    const zs = z - d;
-    if (zs - NOWZ < 1) continue;                 // periode harus dimulai di masa depan
-    const x = musim(id, zMo(zs));
-    if (!x.none && x.f.ok) v.push({ F: x.mean / x.Nm, sk: x.f.msess });
-  }
-  return v.length ? { F: mean(v.map(o => o.F)), sk: mean(v.map(o => o.sk)) } : null;
-}
-compute = function (id, list, ev) {
-  const map = lagMap(), imap = iodMap();
-  return list.map((m, i) => {
-    const f = fit2(id, m.mo), e = ev[i];
-    if (!f) return { m: m, e: e, none: true };
-    const lead = Math.max(0, m.y * 12 + m.mo - 1 - NOWZ), Nm = f.mean;
-    const capped = f.ok && lead > C.MONTHLY_MAX_LEAD, pakai = f.ok && !capped;
-    let F = 1, z = [], s3 = null;
-    if (pakai) {
-      z = zTarget(f, m, lead, e, map, imap);
-      let eta = f.a; f.beta.forEach((b, q) => { eta += b * z[q]; });
-      F = clamp(Math.exp(eta) / Nm, F_LO, F_HI);
-    } else if ((s3 = faktorMusim(id, m))) {
-      F = clamp(s3.F, F_LO, F_HI);               // faktor dari model 3 bulanan
+    const z = m.y * 12 + m.mo - 1, v = [];
+    for (let d = 0; d <= 2; d++) {
+      const zs = z - d;
+      if (zs - NOWZ < 1) continue;                 // periode harus dimulai di masa depan
+      const x = musim(id, zMo(zs));
+      if (!x.none && x.f.ok) v.push({ F: x.mean / x.Nm, sk: x.f.msess });
     }
-    const mu = Nm * F, cv0 = f.cv0;
-          const cvF = pakai && lead <= C.CV_LEAD ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2))
+    return v.length ? { F: mean(v.map(o => o.F)), sk: mean(v.map(o => o.sk)) } : null;
+  }
+  compute = function (id, list, ev) {
+    const map = lagMap(), imap = iodMap();
+    return list.map((m, i) => {
+      const e = ev[i], lead = Math.max(0, m.y * 12 + m.mo - 1 - NOWZ), solo = lead > C.CV_LEAD;
+      const f = fit2(id, m.mo, solo);             // lead panjang: model ENSO-saja
+      if (!f) return { m: m, e: e, none: true };
+      const Nm = f.mean;
+      const capped = f.ok && lead > C.MONTHLY_MAX_LEAD, pakai = f.ok && !capped;
+      let F = 1, z = [], s3 = null, xl = null;
+      if (pakai) {
+        z = zTarget(f, m, lead, e, map, imap);
+        xl = lagE(m.y, m.mo, map); if (xl === null) xl = e;   // ENSO (rata-rata 1-3 bln sebelumnya) yang dipakai
+        let eta = f.a; f.beta.forEach((b, q) => { eta += b * z[q]; });
+        F = clamp(Math.exp(eta) / Nm, F_LO, F_HI);
+      } else if ((s3 = faktorMusim(id, m))) {
+        F = clamp(s3.F, F_LO, F_HI);               // faktor dari model 3 bulanan
+      }
+      const mu = Nm * F, cv0 = f.cv0;
+      const cvF = pakai && !solo ? Math.min(cv0, Math.sqrt(f.cv ** 2 + (.04 * lead) ** 2))
                 : s3 ? Math.max(.2, cv0 * Math.sqrt(Math.max(.3, 1 - s3.sk))) : cv0;
-    const ds = dist(mu, cvF), pl = peluang(Nm, cv0, ds);
-    return { m: m, e: e, F: F, n: f.n, t: f.t, fitOK: pakai || !!s3, src: s3 ? '3bln' : null, sk3: s3 ? s3.sk : null,
-      capped: capped, Nm: Nm, mean: mu, p10: ds.p10, p90: ds.p90, pb: pl.pb, pn: pl.pn, pa: pl.pa, cat: pl.cat, z: z };
-  });
-};
+      const ds = dist(mu, cvF), pl = peluang(Nm, cv0, ds);
+      return { m: m, e: e, F: F, n: f.n, t: f.t, fitOK: pakai || !!s3, src: s3 ? '3bln' : null, sk3: s3 ? s3.sk : null,
+        solo: solo, fm: f, el: xl, capped: capped, Nm: Nm, mean: mu, p10: ds.p10, p90: ds.p90, pb: pl.pb, pn: pl.pn, pa: pl.pa, cat: pl.cat, z: z };
+    });
+  };
+
   /* Kontribusi berurutan (mm): Baseline + dENSO + dIOD + dMJO + dKelvin + dRossby = Prediksi.
      Urutan memengaruhi pembagian karena model berbentuk perkalian; hasil dinormalkan agar jumlahnya pas. */
   function kontribusi(x, f) {
@@ -405,7 +418,7 @@ compute = function (id, list, ev) {
     return o.join(' · ');
   }
   function htmlKotak() {
-    const f12 = PM.map(x => x.none ? null : fit2(kab, x.m.mo));
+    const f12 = PM.map(x => x.none ? null : (x.fm || fit2(kab, x.m.mo)));   // model yang benar-benar dipakai tiap bulan
     const tot = { b: 0, d: PRED.map(() => 0), p: 0 };
     const rows = PM.map((x, i) => {
       if (x.none) return '<tr><td>' + bl(x.m) + '</td><td colspan="9" class="na">data historis belum cukup</td></tr>';
@@ -413,16 +426,20 @@ compute = function (id, list, ev) {
       tot.b += x.Nm; tot.p += x.mean;
       const cells = PRED.map((p, j) => {
         if (dl && dl[j] !== undefined) { tot.d[j] += dl[j]; return '<td style="color:' + (dl[j] < 0 ? 'var(--c1)' : 'var(--c2)') + '">' + sgm(dl[j]) + '</td>'; }
-        const alasan = x.capped ? 'lead terlalu panjang untuk model bulanan' : f.usable.indexOf(p.id) < 0 ? 'data belum tersedia' : 'tidak menurunkan galat LOYO';
+        const alasan = x.solo ? 'tidak teramati pada lead ini (hanya ENSO yang dipakai)' : x.capped ? 'lead terlalu panjang untuk model bulanan' : f.usable.indexOf(p.id) < 0 ? 'data belum tersedia' : 'tidak menurunkan galat LOYO';
         return '<td class="na" title="' + p.nm + ': ' + alasan + '">–</td>';
       }).join('');
-            const jauh = x.m.y * 12 + x.m.mo - 1 - NOWZ > C.CV_LEAD;
-      const lbl = x.src ? 'Model 3 bulanan' : x.capped ? 'Baseline (lead > ' + C.MONTHLY_MAX_LEAD + ' bln)' : f.ok ? f.model + (jauh ? ' (ENSO prakiraan)' : '') : 'Baseline';
-      const skl = x.src ? sg2(x.sk3) : f.ok && !x.capped ? sg2(f.msess) + (jauh ? '*' : '') : '–';
+      const lbl = x.src ? 'Model 3 bulanan' : x.capped ? 'Baseline (lead > ' + C.MONTHLY_MAX_LEAD + ' bln)' : f.ok ? f.model + (x.solo ? ' (ENSO prakiraan)' : '') : 'Baseline';
+      const skl = x.src ? sg2(x.sk3) : f.ok && !x.capped ? sg2(f.msess) + (x.solo ? '*' : '') : '–';
       return '<tr><td>' + bl(x.m) + '</td><td>' + fmt(x.Nm, 0) + '</td>' + cells + '<td><b>' + fmt(x.mean, 0) + '</b></td><td class="na">' + lbl + '</td><td>' + skl + '</td></tr>';
     }).join('');
     const foot = '<tr><td>Total 12 bln</td><td>' + fmt(tot.b, 0) + '</td>' + tot.d.map(v => '<td>' + (v ? sgm(v) : '–') + '</td>').join('') +
       '<td>' + fmt(tot.p, 0) + '</td><td colspan="2"></td></tr>';
+
+    /* ENSO prakiraan yang dipakai pada bulan berlead panjang (agar pembaca tahu angka itu skenario) */
+    const eU = PM.filter(x => !x.none && x.solo && x.fitOK && !x.src && x.el != null);
+    const ensoNote = eU.length ? ' ENSO (rata-rata 1–3 bulan sebelumnya, prakiraan statistik) yang dipakai: ' +
+      eU.map(x => ABR[x.m.mo - 1] + ' ' + x.m.y + ' ≈ ' + sg2(x.el)).join(', ') + '; bila ternyata lebih netral, penyimpangan dari Baseline pada bulan itu mengecil atau hilang.' : '';
 
     const ev = ensoAutoFor(MONTHS).map(r => r.v);
     let nm = 0, pakai = PRED.map(() => 0);
@@ -444,7 +461,8 @@ compute = function (id, list, ev) {
       '<th>Prediksi</th><th>Model terpilih</th><th>Skill (MSESS)</th></tr></thead><tbody>' + rows + '</tbody><tfoot>' + foot + '</tfoot></table></div>' +
       '<p class="note">Satuan mm. Δ = kontribusi berurutan (ENSO → IOD → MJO → Kelvin → Rossby), dinormalkan sehingga Baseline + ΣΔ = Prediksi. “–” = prediktor tidak dipakai di bulan itu. ' +
       'Skill = 1 − MSE/MSE-klimatologi pada validasi leave-one-year-out; model hanya dipakai bila menurunkan galat ≥ ' + Math.round(C.MARGIN * 100) + '%. ' +
-      'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai ENSO prakiraan statistik, bukan ENSO teramati; skill bertanda * hanya berlaku bila prakiraan itu tepat, dan rentang P10–P90 dibuat selebar klimatologi. Model tervalidasi dipakai pada ' + PRED.map((p, j) => p.nm + ' ' + pakai[j]).join(', ') + ' dari ' + nm + ' kombinasi kabupaten-bulan. ' +
+      'Bulan dengan lead > ' + C.CV_LEAD + ' bln memakai ENSO prakiraan statistik dan hanya model ENSO (prediktor lain belum teramati pada lead itu); skill bertanda * dihitung dengan ENSO teramati sehingga hanya berlaku bila prakiraan itu tepat, dan rentang P10–P90 dibuat selebar klimatologi.' + ensoNote +
+      ' Model tervalidasi dipakai pada ' + PRED.map((p, j) => p.nm + ' ' + pakai[j]).join(', ') + ' dari ' + nm + ' kombinasi kabupaten-bulan. ' +
       'MJO/Kelvin/Rossby memakai lag 1 bulan, sehingga hanya memengaruhi bulan terdekat; bulan lebih jauh dianggap netral.</p>' +
       '<h2 style="margin-top:18px">Prediksi tahunan semua kabupaten</h2>' +
       '<div class="tw"><table id="tbl-ann"><thead><tr><th>Kabupaten</th><th>Normal ' + REPORT_YEAR + '</th><th>Prediksi ' + REPORT_YEAR + '</th><th>P10–P90</th><th>% normal</th>' +
@@ -557,7 +575,8 @@ compute = function (id, list, ev) {
     const cards = document.querySelectorAll('#cp .card');
     if (cards[1]) { const th = tahunan(kab), s = cards[1].querySelector('.s'); if (s && th.lo != null) s.textContent += ' · P10–P90 ' + fmt(th.lo, 0) + '–' + fmt(th.hi, 0) + ' mm'; }
     $('pnt').textContent = '† = Baseline (tanpa koreksi prediktor): tidak ada kombinasi ENSO/IOD/MJO/Kelvin/Rossby yang menurunkan galat leave-one-year-out ≥ ' +
-      Math.round(C.MARGIN * 100) + '%, atau data < ' + MIN_N + ' tahun. Kategori memakai tercile klimatologi: Bawah/Atas Normal hanya bila peluangnya ≥ 40%.';
+      Math.round(C.MARGIN * 100) + '%, atau data < ' + MIN_N + ' tahun. Kategori memakai tercile klimatologi: Bawah/Atas Normal hanya bila peluangnya ≥ 40%. ' +
+      'Bulan berlead > ' + C.CV_LEAD + ' bln adalah skenario berbasis ENSO prakiraan statistik, bukan prakiraan terverifikasi.';
     let bh = $('box-homog');
     if (!bh) { bh = document.createElement('section'); bh.className = 'box'; bh.id = 'box-homog'; $('vp').appendChild(bh); }
     bh.innerHTML = htmlHomogen();
