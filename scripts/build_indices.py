@@ -295,7 +295,7 @@ def main():
     ap.add_argument("--wave-stat", default="std", choices=["std", "mean", "absmean"])
     ap.add_argument("--dmi-dir", default="data/indices", help="folder cache berkas mentah DMI")
     ap.add_argument("--rmm-url", default=None, help="cadangan: unduh rmm.txt dari URL ini bila berkas lokal tidak ada")
-    ap.add_argument("--since", type=int, default=1990)
+    ap.add_argument("--since", type=int, default=1980)
     ap.add_argument("--out", default="data/indices/monthly.json")
     a = ap.parse_args()
 
