@@ -3,11 +3,11 @@
      <script src="prediktor.js"></script>
 
    DASHBOARD UTAMA (proyeksi 12 bulan, tabel 3 bulanan, total tahunan):
-     Prediksi = Baseline + ENSO + IOD.   (MJO, Kelvin, Rossby TIDAK dipakai di sini.)
+     Prediksi = Baseline + ENSO (+ El Niño⁺) + IOD.   (MJO, Kelvin, Rossby TIDAK dipakai di sini.)
 
    Cara kerja (per kabupaten x bulan kalender):
    1. Model log-link (Poisson/IRLS) dengan penalti ridge pada prediktor terstandar.
-   2. Rantai model bersarang: Baseline -> +ENSO -> +IOD.
+   2. Rantai model bersarang: Baseline -> +ENSO -> +IOD -> (+ENSO + El Niño⁺).
    3. Tiap model dinilai dengan leave-one-year-out (LOYO). Model yang lebih kompleks hanya
       dipakai bila menurunkan MSE minimal MARGIN (3%) dan selisihnya signifikan (uji berpasangan).
       Bila tidak ada yang mengalahkan klimatologi, hasilnya = Baseline.
@@ -17,8 +17,8 @@
    PROYEKSI 12 BULAN:
    - Lead <= CV_LEAD (3 bln): model ENSO+IOD dengan ENSO/IOD teramati. Bila model bulanan tidak lolos,
      dipakai faktor dari model 3 bulanan (bila lolos).
-   - Lead > CV_LEAD: model ENSO-SAJA dengan ENSO prakiraan statistik (fauto), diredam ATT. Rentang P10-P90
-     dan peluang dibuat selebar klimatologi, karena skill LOYO dihitung dengan ENSO teramati.
+   - Lead > CV_LEAD: model ENSO-SAJA (+ opsi El Niño⁺) dengan ENSO prakiraan statistik (fauto), diredam ATT.
+     Rentang P10-P90 dan peluang dibuat selebar klimatologi, karena skill LOYO dihitung dengan ENSO teramati.
 
    JANGKA PENDEK (kotak terpisah, hanya BULAN DEPAN):
    - Rantai Baseline -> +ENSO -> +IOD -> +MJO -> +Kelvin -> +Rossby. Gelombang memakai nilai bulan
@@ -38,6 +38,8 @@
     ZSEL: 1.5,          // selisih galat kuadrat per tahun (LOYO) harus >= ZSEL x galat baku (uji berpasangan)
     TAU_IOD: 2,         // peluruhan IOD (bulan) untuk bulan yang belum teramati
     ZMAX: 2.5,          // batas |z| prediktor terstandar
+    ASIM: true,         // uji kandidat asimetri El Niño (ENSO + max(0, ENSO))
+    ASIM_HINGE: 0,      // titik tekuk El Niño⁺ (0 = mulai dari nol; 0.5 = hanya El Niño resmi)
     MJO_VAR: 'mc',      // fraksi hari MJO aktif di fase 4-5 (Maritime Continent)
     MIN_DAYS: 20,       // bulan harian dianggap lengkap bila >= 20 hari
     MIN_DAYS_NOW: 10,   // bulan berjalan boleh dipakai bila >= 10 hari
@@ -52,8 +54,10 @@
     { id: 'iod', nm: 'IOD' },
     { id: 'mjo', nm: 'MJO' },
     { id: 'kelvin', nm: 'Kelvin' },
-    { id: 'rossby', nm: 'Rossby' }
+    { id: 'rossby', nm: 'Rossby' },
+    { id: 'ensop', nm: 'El Niño' }
   ];
+  const ASY = 5;   // indeks prediktor asimetri di PRED
   const PRED_UTAMA = PRED.slice(0, 2);   // prediktor untuk dashboard utama (proyeksi 3/6/12 bulan)
   let IDX = null, iodC = null;
   { const v = bacaLS('ch_posmin_v1'); if (typeof v === 'number' && isFinite(v) && v >= 0) C.POS_MIN = v; }
@@ -114,6 +118,7 @@
   /* prediktor mentah untuk data LATIH (hanya nilai teramati) */
   function rawTrain(p, y, mo) {
     if (p.id === 'enso') return lagE(y, mo, ENS.obs);
+    if (p.id === 'ensop') { const x = lagE(y, mo, ENS.obs); return x === null ? null : Math.max(0, x - C.ASIM_HINGE); }
     if (p.id === 'iod') return IDX && IDX.dmi ? lagE(y, mo, IDX.dmi) : null;
     const S = serie(p.id); if (!S) return null;
     const q = prevZ(y, mo, 1);
@@ -199,8 +204,11 @@
     F.usable = usable.map(j => PRED[j].id);
     if (!usable.length) return F;
 
+    const base = usable.filter(j => j !== ASY);
     const all = y.map((_, i) => i), chain = [[]];
-    usable.forEach((j, k) => chain.push(usable.slice(0, k + 1)));
+    base.forEach((j, k) => chain.push(base.slice(0, k + 1)));
+    if (usable.indexOf(ASY) > -1 && base.indexOf(0) > -1) chain.push([0, ASY]);   // ENSO + tambahan El Niño
+
     const res = chain.map((S, k) => k ? looModel(S, raw, y, all) : null);
     const mses = chain.map((S, k) => k ? res[k].mse : mseC);
     const sq = chain.map((S, k) => k ? y.map((v, i) => (v - res[k].preds[i]) ** 2) : y.map((v, i) => (v - loC[i]) ** 2));
@@ -221,15 +229,15 @@
     return F;
   }
   /* model BULANAN. mode:
-       (kosong) = ENSO + IOD, dipakai dashboard utama
-       'E'      = ENSO saja, dipakai untuk lead panjang (prediktor lain tidak teramati)
+       (kosong) = ENSO + IOD (+ El Niño⁺), dipakai dashboard utama
+       'E'      = ENSO saja (+ El Niño⁺), dipakai untuk lead panjang (prediktor lain tidak teramati)
        'W'      = ENSO + IOD + MJO + Kelvin + Rossby, dipakai HANYA oleh kotak jangka pendek (bulan depan) */
   function fit2(id, mo, mode) {
     const cache = A[id].fit, ck = mode ? mo + mode : mo;
     if (cache[ck] !== undefined) return cache[ck];
     const R = A[id].rain.filter(t => t.mo === mo && okPos(id, t));
     const raw = R.map(t => PRED.map(p => rawTrain(p, t.y, t.mo)));
-    const izin = PRED.map((p, j) => mode === 'W' ? true : mode === 'E' ? j === 0 : j < 2);
+    const izin = PRED.map((p, j) => j === ASY ? (C.ASIM && mode !== 'W') : mode === 'W' ? true : mode === 'E' ? j === 0 : j < 2);
     return (cache[ck] = fitCore(R.map(t => t.y), R.map(t => t.mm), raw, izin, .2));
   }
   fit = function (id, mo) { return fit2(id, mo); };   // satu cache untuk semua pemanggil
@@ -240,6 +248,7 @@
     return f.idxS.map((pj, q) => {
       const id = PRED[pj].id; let x = null;
       if (id === 'enso') { x = lagE(m.y, m.mo, map); if (x === null) x = e; }
+      else if (id === 'ensop') { x = lagE(m.y, m.mo, map); if (x === null) x = e; x = Math.max(0, x * att - C.ASIM_HINGE); }
       else if (id === 'iod') x = lagE(m.y, m.mo, imap);
       else { const S = serie(id); if (S) { const p = prevZ(m.y, m.mo, 1); x = nilai1(S, p.y, p.mo, true); } }
       if (x === null || x === undefined) return 0;
@@ -271,7 +280,7 @@
     const map = lagMap(), imap = iodMap();
     return list.map((m, i) => {
       const e = ev[i], lead = Math.max(0, m.y * 12 + m.mo - 1 - NOWZ), solo = lead > C.CV_LEAD;
-      const f = fit2(id, m.mo, solo ? 'E' : '');   // lead panjang: ENSO-saja; selain itu ENSO+IOD
+      const f = fit2(id, m.mo, solo ? 'E' : '');   // lead panjang: ENSO-saja (+El Niño⁺); selain itu ENSO+IOD
       if (!f) return { m: m, e: e, none: true };
       const Nm = f.mean;
       const capped = f.ok && lead > C.MONTHLY_MAX_LEAD, pakai = f.ok && !capped;
@@ -298,7 +307,11 @@
   function kontribusi(x, f) {
     if (!f || !f.ok || !x.z || x.capped || !x.z.length) return null;
     const out = {}; let acc = 0, gPrev = 1, tot = 0;
-    f.idxS.forEach((pj, q) => { acc += f.beta[q] * x.z[q]; const g = Math.exp(acc); out[pj] = x.Nm * (g - gPrev); gPrev = g; tot += out[pj]; });
+    f.idxS.forEach((pj, q) => {
+      acc += f.beta[q] * x.z[q];
+      const g = Math.exp(acc), d = x.Nm * (g - gPrev), sl = pj === ASY ? 0 : pj;
+      out[sl] = (out[sl] || 0) + d; gPrev = g; tot += d;
+    });
     const want = x.mean - x.Nm;
     if (tot * want > 0) { const s = clamp(want / tot, .5, 2); Object.keys(out).forEach(k => { out[k] *= s; }); }
     return out;
@@ -472,7 +485,7 @@
 
     const ev = ensoAutoFor(MONTHS).map(r => r.v);
     let nm = 0, pakai = PRED_UTAMA.map(() => 0);
-    KAB.forEach(k => { for (let mo = 1; mo <= 12; mo++) { const f = fit2(k.id, mo); if (!f) continue; nm++; f.idxS.forEach(j => { pakai[j]++; }); } });
+    KAB.forEach(k => { for (let mo = 1; mo <= 12; mo++) { const f = fit2(k.id, mo); if (!f) continue; nm++; f.idxS.forEach(j => { if (j < 2) pakai[j]++; }); } });
     const ann = KAB.map(k => {
       const ms = compute(k.id, MONTHS, ev).filter(x => !x.none), ty = tahunan(k.id), an = annual(k.id);
       if (!ms.length) return '<tr><td>' + k.nm + '</td><td colspan="8" class="na">data belum cukup</td></tr>';
@@ -551,7 +564,7 @@
 
   /* Kotak jangka pendek: bulan depan dengan koreksi MJO / Kelvin / Rossby (terpisah dari dashboard utama) */
   function htmlPendek() {
-    const m = MONTHS[0], pv = prevZ(m.y, m.mo, 1), gn = gelNow(m), GE = PRED.slice(2);
+    const m = MONTHS[0], pv = prevZ(m.y, m.mo, 1), gn = gelNow(m), GE = PRED.slice(2, 5);
     const nilaiTxt = WAVES.map((w, q) => GE[q].nm + ' ' + (gn[q] && gn[q].v !== null ? fmt(gn[q].v, 2) + (gn[q].n != null ? ' (' + gn[q].n + ' hari)' : '')
       : gn[q] && gn[q].n != null ? 'belum cukup data (' + gn[q].n + ' hari, minimal ' + C.MIN_DAYS_NOW + ')' : 'belum tersedia')).join(' · ');
     let nGel = 0, nAll = 0;
@@ -675,6 +688,7 @@
     resetFit(); render();
   });
   window.PREDIKTOR = { htmlHomogen: htmlHomogen, C: C, musim: musim, htmlMusim: htmlMusim, WIN: WIN, nilai1: nilai1, serie: serie, fit2: fit2, annual: annual, kontribusi: kontribusi, pendek: pendek, htmlPendek: htmlPendek, setIdx: d => { IDX = d; iodC = null; resetFit(); }, htmlKotak: htmlKotak };
+  window.PREDIKTOR.setAsim = v => { C.ASIM = !!v; resetFit(); if (!$('app').hidden && tahun != null) render(); };
   muatIdx();
   if (typeof RAW !== 'undefined' && RAW && Object.keys(RAW).length && tahun != null) { resetFit(); render(); }
 })();
