@@ -717,9 +717,11 @@ const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND',
 const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/), i = SEAS.indexOf(p[0]); if (p.length >= 4 && i > -1 && isFinite(p[1]) && isFinite(p[3])) o[+p[1] + '-' + (i + 1)] = +p[3]; }); return { obs: o, name: 'NOAA CPC · oni.ascii.txt' }; };
 
 const OK_ = 'ch_oni_v1';
-const DK = 'ch_data_' + ((API_URL.match(/\/s\/([^/]+)\//) || [0, 'x'])[1]).slice(-12);   // cache hujan terpisah per sumber
+const bacaLS = k => { ... };
+const tulisLS = (k, v) => { ... };
+const DK = 'ch_data_' + ((API_URL.match(/\/s\/([^/]+)\//) || [0, 'x'])[1]).slice(-12);
 let SUMBER_HUJAN = 'tidak disebutkan oleh server';
-function setSumber(s) { if (s) SUMBER_HUJAN = s; const el = $('sdh'); if (el) el.textContent = SUMBER_HUJAN; }
+function setSumber(s) { ... }
 
 /* Semua sumber ENSO dipanggil BERSAMAAN (timeout 8 dtk), hasil dipilih menurut prioritas.
    Sebelumnya berurutan dengan timeout 12 dtk masing-masing (bisa sampai 36 dtk). */
@@ -1233,7 +1235,7 @@ $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); pros
 $('thn').onchange = e => pilihTahun(+e.target.value);
 $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
 let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { const rw = S().years[tahun] || Array(12).fill(null); gambar(rw); gambarEnso(); gambarHH(rw); } } }, 150); });
-muat();
+muat().catch(e => { $('st').textContent = 'Gagal memuat: ' + e.message; console.error(e); });
 </script>
       <script src="perbaikan.js"></script>
    <script src="prediktor.js"></script>
