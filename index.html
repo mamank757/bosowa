@@ -142,7 +142,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 <body>
 <div class="wrap">
   <h1 id="jd">Data Riwayat Curah Hujan Kabupaten/Kota Sulawesi Selatan</h1>
-  <p class="sub" id="upd">Sumber Data: Telemetri BBWS Pompengan Jeneberang · rata-rata seluruh pos per kabupaten · Data ONI s.d. <span id="ons">…</span></p>
+  <p class="sub" id="upd">Sumber Data: <span id="sdh">memuat…</span> · Data ONI s.d. <span id="ons">…</span></p>
 
   <div id="st" role="status">Memuat data…</div>
 
@@ -309,7 +309,7 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 
 <script>
 // URL web app Apps Script
-const API_URL = 'https://script.google.com/macros/s/AKfycbzTR_8nMj8kQEUjXWBRXxPllAN4fsYJPtc2TRzZUx-ST18MiO0Jl5Iy7pAAgcMjtbhz/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxEUvBj-Wq1_3Kpd-ASpDd5L3p7aYe9XVtNM-2z964P144pBPNk4cVZ2OEzEGs6ZYRT/exec';
 const BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxuPrth8vy5T7T5yk9BTnJDnbjfqKMumdzK2oydkAEAoFqlgPyMdge7XL3LMo68UBxlUg/exec';
 const NOAA_ONI = 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt';
 const NOAA_SST = 'https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices';
@@ -579,7 +579,7 @@ async function unduhPDF() {
   finally { PDF_W = 0; render(); window.scrollTo(0, sy); }   // kembalikan tampilan layar
   const tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   const el = document.createElement('div'); el.className = 'pdf-report';
-  el.innerHTML = `<div class="pdf-head"><h1>${d.judul}</h1><p class="pdf-sub">Sumber Data: Telemetri BBWS Pompengan Jeneberang · dicetak ${tgl}</p></div>` + blok +
+  el.innerHTML = `<div class="pdf-head"><h1>${d.judul}</h1><p class="pdf-sub">Sumber Data: ${SUMBER_HUJAN} · dicetak ${tgl}</p></div>` + blok +
     `<div class="pdf-sec pdf-keep"><h3>Rincian data</h3>${mode === 'semua' ? tabelBandingPDF() : tabelHtml(d)}${d.catatan ? `<p class="pdf-leg">${d.catatan}</p>` : ''}</div>`;
   await html2pdf().set({
     margin: [10, 10, 12, 10], filename: d.nama + '.pdf', image: { type: 'jpeg', quality: 0.95 },
@@ -716,9 +716,10 @@ const pRn = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.tri
 const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND','NDJ'];
 const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/), i = SEAS.indexOf(p[0]); if (p.length >= 4 && i > -1 && isFinite(p[1]) && isFinite(p[3])) o[+p[1] + '-' + (i + 1)] = +p[3]; }); return { obs: o, name: 'NOAA CPC · oni.ascii.txt' }; };
 
-const OK_ = 'ch_oni_v1', DK = 'ch_data_v1';
-const bacaLS = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
-const tulisLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const OK_ = 'ch_oni_v1';
+const DK = 'ch_data_' + ((API_URL.match(/\/s\/([^/]+)\//) || [0, 'x'])[1]).slice(-12);   // cache hujan terpisah per sumber
+let SUMBER_HUJAN = 'tidak disebutkan oleh server';
+function setSumber(s) { if (s) SUMBER_HUJAN = s; const el = $('sdh'); if (el) el.textContent = SUMBER_HUJAN; }
 
 /* Semua sumber ENSO dipanggil BERSAMAAN (timeout 8 dtk), hasil dipilih menurut prioritas.
    Sebelumnya berurutan dengan timeout 12 dtk masing-masing (bisa sampai 36 dtk). */
@@ -1201,14 +1202,14 @@ async function muat() {
     $('st').hidden = true; $('app').hidden = false; tampil = true; render();
   };
   // 1) Kunjungan berulang: tampil seketika dari cache lokal
-  if (cd && cd.data) { RAW = cd.data; tampilkan(); }
+  if (cd && cd.data) { RAW = cd.data; setSumber(cd.sumber); tampilkan(); }
   // 2) Semua permintaan jaringan berjalan paralel, tidak saling menunggu
   const pEns = ambilEnso().catch(() => {});
   const pBatas = muatBatas();
   try {
     const j = JSON.parse(await ft(API_URL + '?aksi=ch_bulanan&kab=semua', 30000));
     if (j.error) throw new Error(j.error);
-    RAW = j.data; tulisLS(DK, { at: Date.now(), data: RAW });
+    RAW = j.data; setSumber(j.sumber_hujan); tulisLS(DK, { at: Date.now(), data: RAW, sumber: SUMBER_HUJAN });
     tampilkan();                       // tampil begitu data hujan tiba, tanpa menunggu ENSO
   } catch (e) {
     if (!tampil) { $('st').innerHTML = 'Gagal memuat (' + (e.name === 'AbortError' ? 'timeout' : e.message) + ') <button type="button" onclick="muat()">Coba lagi</button>'; return; }
