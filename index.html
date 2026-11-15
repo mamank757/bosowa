@@ -717,11 +717,11 @@ const SEAS = ['DJF','JFM','FMA','MAM','AMJ','MJJ','JJA','JAS','ASO','SON','OND',
 const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.trim().split(/\s+/), i = SEAS.indexOf(p[0]); if (p.length >= 4 && i > -1 && isFinite(p[1]) && isFinite(p[3])) o[+p[1] + '-' + (i + 1)] = +p[3]; }); return { obs: o, name: 'NOAA CPC · oni.ascii.txt' }; };
 
 const OK_ = 'ch_oni_v1';
-const bacaLS = k => { ... };
-const tulisLS = (k, v) => { ... };
+const bacaLS = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+const tulisLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 const DK = 'ch_data_' + ((API_URL.match(/\/s\/([^/]+)\//) || [0, 'x'])[1]).slice(-12);
 let SUMBER_HUJAN = 'tidak disebutkan oleh server';
-function setSumber(s) { ... }
+function setSumber(s) { if (s) SUMBER_HUJAN = s; const el = $('sdh'); if (el) el.textContent = SUMBER_HUJAN; }
 
 /* Semua sumber ENSO dipanggil BERSAMAAN (timeout 8 dtk), hasil dipilih menurut prioritas.
    Sebelumnya berurutan dengan timeout 12 dtk masing-masing (bisa sampai 36 dtk). */
