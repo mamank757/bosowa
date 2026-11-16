@@ -658,6 +658,7 @@
       '<div class="tw"><table id="tbl-homog"><thead><tr><th>Kabupaten</th><th>Jenis data</th><th>Mulai</th><th>Terakhir</th><th>Bulan lengkap / rentang</th><th>Kelengkapan</th><th>Pos rata-rata awal → kini</th><th>Saran pos minimum</th></tr></thead><tbody>' + rows + '</tbody></table></div>' + ctrl + per;
   }
 
+  let pascaTok = 0;
   function pasca2() {
     if (mode !== 'proy') return;
     document.querySelectorAll('#tbl-proyeksi thead th').forEach(th => { if (th.textContent.trim() === 'n / t') th.textContent = 'n / skill'; });
@@ -673,21 +674,59 @@
     $('pnt').textContent = '† = Baseline (tanpa koreksi prediktor): tidak ada kombinasi ENSO/IOD yang menurunkan galat leave-one-year-out ≥ ' +
       Math.round(C.MARGIN * 100) + '%, atau data < ' + MIN_N + ' tahun. Kategori memakai tercile klimatologi: Bawah/Atas Normal hanya bila peluangnya ≥ 40%. ' +
       'Bulan berlead > ' + C.CV_LEAD + ' bln adalah skenario berbasis ENSO prakiraan statistik, bukan prakiraan terverifikasi.';
-    let bh = $('box-homog');
-    if (!bh) { bh = document.createElement('section'); bh.className = 'box'; bh.id = 'box-homog'; $('vp').appendChild(bh); }
-    bh.innerHTML = htmlHomogen();
-    let bs = $('box-seas');
-    if (!bs) { bs = document.createElement('section'); bs.className = 'box'; bs.id = 'box-seas'; $('vp').appendChild(bs); }
-    bs.innerHTML = htmlMusim();
-    let box = $('box-pred');
-    if (!box) { box = document.createElement('section'); box.className = 'box'; box.id = 'box-pred'; $('vp').appendChild(box); }
-    box.innerHTML = htmlKotak();
-    let bp = $('box-pendek');
-    if (!bp) { bp = document.createElement('section'); bp.className = 'box'; bp.id = 'box-pendek'; $('vp').appendChild(bp); }
-    bp.innerHTML = htmlPendek();
+    /* Empat kotak berat dibangun BERTAHAP (satu per giliran, agar tampilan atas muncul dulu) dan DILEWATI
+       bila kabupaten dan data modelnya tidak berubah sejak terakhir dibangun (A[kab].fit diganti saat data berubah). */
+    const sig = A[kab].fit, tok = ++pascaTok;
+    const daftar = [['box-homog', htmlHomogen], ['box-seas', htmlMusim], ['box-pred', htmlKotak], ['box-pendek', htmlPendek]];
+    daftar.forEach(d => {
+      let b = $(d[0]);
+      if (!b) { b = document.createElement('section'); b.className = 'box'; b.id = d[0]; $('vp').appendChild(b); }
+      if (b.__fit !== sig || b.__kab !== kab) b.style.opacity = '.45';   // isi lama, sedang diperbarui
+    });
+    (function isi(i) {
+      if (tok !== pascaTok || mode !== 'proy' || i >= daftar.length) return;
+      const b = $(daftar[i][0]);
+      if (b.__fit !== sig || b.__kab !== kab) {
+        try { b.innerHTML = daftar[i][1](); } catch (e) { console.warn('prediktor.js:', e); }
+        b.__fit = sig; b.__kab = kab; b.style.opacity = '';
+      }
+      setTimeout(() => isi(i + 1), 0);
+    })(0);
   }
   const _render = render;
   render = function () { _render(); try { pasca2(); } catch (e) { console.warn('prediktor.js:', e); } };
+
+  /* ================= KECEPATAN: MEMOISASI + PEMANASAN ================= */
+  /* compute() dipanggil puluhan kali per render (ringkasan semua kabupaten, tahunan, kotak prediksi, jangka pendek)
+     dengan masukan yang sama, dan tiap panggilan menghitung kuantil gamma dengan bisection. Hasilnya disimpan di
+     A[id].fit (objek ini diganti baru setiap data/indeks/opsi berubah, jadi cache ikut terhapus otomatis). */
+  const _computeAsli = compute;
+  compute = function (id, list, ev) {
+    const fc = A[id].fit, kc = fc._cmp || (fc._cmp = {});
+    const k = list.map(m => m.y * 12 + m.mo).join(',') + '|' + ev.join(',');
+    return kc[k] || (kc[k] = _computeAsli(id, list, ev));
+  };
+
+  /* Pemanasan: model leave-one-year-out (cache dingin) dihitung saat browser menganggur, satu kabupaten per giliran,
+     supaya klik "Proyeksi 12 bulan" pertama tidak menanggung seluruh biayanya. */
+  let warmTok = 0;
+  function prehangat() {
+    const tok = ++warmTok, ids = KAB.map(k => k.id).filter(id => A[id] && A[id].fit);
+    let i = 0;
+    (function jalan() {
+      if (tok !== warmTok || i >= ids.length) return;
+      const id = ids[i++];
+      try {
+        for (let mo = 1; mo <= 12; mo++) { fit2(id, mo); fit2(id, mo, 'E'); }
+        const ev = ensoAutoFor(MONTHS).map(r => r.v);
+        compute(id, MONTHS, ev); tahunan(id); pendek(id);
+        WIN.forEach(s => musim(id, s));
+      } catch (e) { console.warn('prehangat:', e); }
+      setTimeout(jalan, 0);
+    })();
+  }
+  const _prosesAsli = proses;
+  proses = function (d) { _prosesAsli(d); prehangat(); };
 
   /* ================= MUAT monthly.json ================= */
   function resetFit() { KAB.forEach(k => { if (A[k.id]) A[k.id].fit = {}; }); }
@@ -699,6 +738,7 @@
       if (adaIdx(j)) { IDX = j; iodC = null; tulisLS(C.LS, j); }
     } catch (e) { console.warn('prediktor.js: monthly.json tidak termuat —', e.message); }
     resetFit();
+    prehangat();
     if (!$('app').hidden && tahun != null) render();
   }
   document.addEventListener('change', e => {
@@ -711,5 +751,5 @@
   /* sakelar asimetri El Niño: PREDIKTOR.setAsim(false) mengembalikan perilaku lama tanpa mengubah berkas */
   window.PREDIKTOR.setAsim = v => { C.ASIM = !!v; resetFit(); if (!$('app').hidden && tahun != null) render(); };
   muatIdx();
-  if (typeof RAW !== 'undefined' && RAW && Object.keys(RAW).length && tahun != null) { resetFit(); render(); }
+  if (typeof RAW !== 'undefined' && RAW && Object.keys(RAW).length && tahun != null) { resetFit(); render(); prehangat(); }
 })();
