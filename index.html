@@ -144,6 +144,14 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
   <h1 id="jd">Data Riwayat Curah Hujan Kabupaten/Kota Sulawesi Selatan</h1>
   <p class="sub" id="upd">Sumber Data: <span id="sdh">memuat…</span> · Data ONI s.d. <span id="ons">…</span></p>
 
+  <div class="bar" id="bsumber">
+    <div class="bar-left">
+      <label for="sumber-sel" class="lb">Sumber data hujan</label>
+      <select id="sumber-sel" aria-label="Sumber data hujan"></select>
+      <span class="note" id="sumber-st" style="margin:0"></span>
+    </div>
+  </div>
+
   <div id="st" role="status">Memuat data…</div>
 
   <div id="app" hidden>
@@ -308,7 +316,6 @@ td .ps{display:block;font-size:.72rem;color:var(--mut);font-weight:500}
 <div id="tooltip" class="glass-tooltip"></div>
 
 <script>
-// URL web app Apps Script
 // ===== DAFTAR SUMBER DATA HUJAN: isi URL exec di sini, sekali saja =====
 const SUMBER = [
   { id: 'sumber1', nama: 'BBWS', url: 'https://script.google.com/macros/s/AKfycbwm4ZIBX5aQ5lsDdRON0L5vR0F3X_WChzrKdLvu7kKMdtH4Oixt0tiNhyw96hJy9-lzug/exec' },
@@ -355,7 +362,7 @@ const KAB = [
 const TAMPIL_AWAL = KAB.map(k => k.id);   // semua tampil saat dashboard dibuka
 const HANYA = ['wajo'];                   // untuk tombol "Hanya Wajo"
 const wk = j => j < 4 ? `var(--c${j})` : `hsl(${Math.round((j * 137.5 + 60) % 360)}, 62%, 48%)`;
-  const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => n == null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
 const sg = v => v == null ? '–' : (v > 0 ? '+' : '') + fmt(v, 1);
@@ -365,11 +372,11 @@ const valid = r => r.pos_rata == null || r.pos_rata > 0;
 const kuat = r => Math.abs(r) >= .5 ? 'kuat' : Math.abs(r) >= .3 ? 'sedang' : 'lemah';
 let ONI = {}, A = {}, RAW = {}, kab = 'wajo', tahun = null, mode = 'kab', hid = {}, PM = [];
 let EST = {};   // 'YYYY-MM' -> 1 = estimasi SST mingguan, 2 = estimasi sementara
-let BOM = {};   // 'YYYY-M' -> Niño-3.4 input manual BoM  
+let BOM = {};   // 'YYYY-M' -> Niño-3.4 input manual BoM
 const tandaEst = (y, i) => EST[y + '-' + ('0' + (i + 1)).slice(-2)] || 0;   // i = indeks bulan 0-11
-  KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
+KAB.forEach(k => { hid[k.id] = TAMPIL_AWAL.indexOf(k.id) < 0; });
 let leafletMap = null; // Global Map instance
-const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; }; 
+const oniOf = (y, m) => { const v = (ONI[y] || [])[m]; return v == null ? null : v; };
 const bomOf = (y, i) => { const v = BOM[y + '-' + (i + 1)]; return v === undefined ? null : v; };
 const S = () => A[kab];
 const nmKab = () => KAB.filter(k => k.id === kab)[0].nm;
@@ -729,7 +736,11 @@ const pOni = t => { const o = {}; t.split(/\r?\n/).forEach(l => { const p = l.tr
 const OK_ = 'ch_oni_v1';
 const bacaLS = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
 const tulisLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-const DK = 'ch_data_' + ((API_URL.match(/\/s\/([^/]+)\//) || [0, 'x'])[1]).slice(-12);
+const dk = s => 'ch_data_' + s.id;   // cache lokal terpisah per sumber
+const urlApi = (u, q) => u + (u.indexOf('?') > -1 ? '&' : '?') + q;
+try {   // hapus cache lama (kunci berdasar potongan URL) agar kuota localStorage tidak terbuang
+  Object.keys(localStorage).filter(k => k.indexOf('ch_data_') === 0 && !SUMBER.some(s => dk(s) === k)).forEach(k => localStorage.removeItem(k));
+} catch (e) {}
 let SUMBER_HUJAN = 'tidak disebutkan oleh server';
 function setSumber(s) { if (s) SUMBER_HUJAN = s; const el = $('sdh'); if (el) el.textContent = SUMBER_HUJAN; }
 
@@ -766,22 +777,26 @@ function terapkanOni(d) {
     : la > lr ? 'resmi s.d. ' + nb(lr) + ', estimasi s.d. ' + nb(la) + ' (' + d.name + ')'
     : nb(la) + ' (' + d.name + ')';
 }
+/* ONI & BoM tidak bergantung pada sumber hujan: coba sumber aktif dulu, lalu sumber lain bila gagal */
+async function apiJson(q, ok, ms) {
+  for (const s of [SRC].concat(SUMBER.filter(x => x !== SRC))) {
+    try { const o = JSON.parse(await ft(urlApi(s.url, q), ms)); if (!o.error && ok(o)) return o; } catch (e) {}
+  }
+  return null;
+}
 async function oniLoad() {
-  const pn = Promise.resolve(null);   // NOAA langsung diblokir CORS, tidak dipakai
   let d = null;
-  try { const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=oni', 8000)); if (o && o.data && Object.keys(o.data).length) d = { obs: toObs(o.data), estimasi: o.estimasi || [], sementara: o.sementara || [], name: 'Satelit NOAA' }; } catch (e) {}
-  if (!d) { const x = await pn; if (x && Object.keys(x.obs).length) d = x; }
+  const o = await apiJson('aksi=oni', x => x.data && Object.keys(x.data).length, 8000);
+  if (o) d = { obs: toObs(o.data), estimasi: o.estimasi || [], sementara: o.sementara || [], name: 'Satelit NOAA' };
   if (d) tulisLS(OK_, d); else d = bacaLS(OK_);
-    terapkanOni(d);
+  terapkanOni(d);
 }
 const BK = 'ch_bom_v1';
 function terapkanBom(d) { BOM = d && d.data ? toObs(d.data) : {}; }
 async function bomLoad() {
   let d = null;
-  try {
-    const o = JSON.parse(await ft(API_URL + (API_URL.indexOf('?') > -1 ? '&' : '?') + 'aksi=bom', 8000));
-    if (o && o.data) d = { data: o.data };
-  } catch (e) {}
+  const o = await apiJson('aksi=bom', x => x.data, 8000);
+  if (o) d = { data: o.data };
   if (d) tulisLS(BK, d); else d = bacaLS(BK);
   terapkanBom(d);
 }
@@ -879,7 +894,7 @@ function gambarEnso() {
   });
   $('enso').innerHTML = s + '</svg>';
 }
-  function gambarHH(rows) {
+function gambarHH(rows) {
   if (!rows.some(r => r && r.hari_hujan != null)) {
     $('hh').innerHTML = '<p class="note">Data hari hujan belum tersedia dari server. Pastikan Apps Script sudah diperbarui (field <code>hari_hujan</code>) dan di-deploy ulang.</p>';
     return;
@@ -1022,17 +1037,11 @@ function updateMap() {
   if (ada) {
     geoLayer = L.geoJSON(geoData, {
       filter: f => !!nilai[idDariFitur(f)],
-      style: f => { 
-  const p = nilai[idDariFitur(f)];
-  const c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
-  
-  return { 
-    fillColor: 'rgb(' + c.join(',') + ')', // Gunakan .join(',') agar string array diproses dengan aman
-    fillOpacity: 0.85, 
-    color: 'red', // Paksa garis tepi berwarna merah agar pasti terlihat
-    weight: 0.5 
-  }; 
-},
+      style: f => {
+        const p = nilai[idDariFitur(f)];
+        const c = warna((p.v - S_.vmin) / (S_.vmax - S_.vmin));
+        return { fillColor: 'rgb(' + c.join(',') + ')', fillOpacity: 0.85, color: 'red', weight: 0.5 };
+      },
       onEachFeature: (f, l) => { const p = nilai[idDariFitur(f)];
         l.bindTooltip(`<b>${p.nm}</b> ${fmt(p.v, 0)} mm`, { permanent: true, direction: 'center', className: 'map-lbl' }); }
     }).addTo(leafletMap);
@@ -1138,10 +1147,10 @@ function proy() {
   $('psl').textContent = ENS.name;
   $('es').innerHTML = ens.map((r, i) => `<div class="ec"><span>${BLN[MONTHS[i].mo - 1].slice(0, 3)} ${String(MONTHS[i].y).slice(2)}</span><b class="${kls(r.v)}">${sg(r.v)}</b><small>${SB[r.s]}</small></div>`).join('');
 
-   const nb = ens.filter(r => r.s === 'bom').length;
+  const nb = ens.filter(r => r.s === 'bom').length;
   $('psm').textContent = nb ? nb + ' bulan memakai input manual BoM (tab "BoM"), bukan prakiraan otomatis.' : '';
   grafikProy();
-  
+
   let tb = 0, tp = 0;
   $('tpm').innerHTML = PM.map(x => {
     if (x.none) return `<tr><td>${bl(x.m)}</td><td colspan="9">data historis belum cukup</td></tr>`;
@@ -1149,7 +1158,7 @@ function proy() {
     return `<tr><td>${bl(x.m)}</td><td>${fmt(x.Nm, 0)}</td><td><b>${fmt(x.mean, 0)}</b></td><td>${fmt(x.p10, 0)}–${fmt(x.p90, 0)}</td><td>${fmt(x.mean / x.Nm * 100, 0)}% <span class="${d < 0 ? 'fe' : 'fl'}">${d > 0 ? '+' : ''}${fmt(d, 0)}</span></td><td class="${kls(x.e)}">${sg(x.e)}</td><td>${fmt(x.F, 2)}</td><td class="na">${x.n}/${fmt(x.t, 2)}</td><td><div class="pr"><div class="pb"><i style="width:${x.pb * 100}%;background:var(--c1)"></i><i style="width:${x.pn * 100}%;background:var(--mut)"></i><i style="width:${x.pa * 100}%;background:var(--c2)"></i></div><span>${Math.round(x.pb * 100)}/${Math.round(x.pn * 100)}/${Math.round(x.pa * 100)}%</span></div></td><td><span class="cat ${x.cat}">${CN[x.cat]}</span></td></tr>`;
   }).join('');
   $('tpf').innerHTML = `<tr><td>Total</td><td>${fmt(tb, 0)}</td><td>${fmt(tp, 0)}</td><td>—</td><td>${tb ? fmt(tp / tb * 100, 0) + '%' : '–'}</td><td colspan="5"></td></tr>`;
-  
+
   renderAgriTimeline(PM);
   $('th-filter').dispatchEvent(new Event('input'));
 }
@@ -1163,9 +1172,9 @@ function grafikProy() {
   PM.forEach((c, i) => {
     const cx = m.l + cw * (i + .5);
     const yy = String(c.m.y).slice(2), bn = BLN[c.m.mo - 1].slice(0, 3);
-s += u.kecil
-  ? `<text x="${cx}" y="${H - 28}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn}</text><text x="${cx}" y="${H - 13}" text-anchor="middle" font-size="${fa}" fill="var(--mut)">${yy}</text>`
-  : `<text x="${cx}" y="${H - 26}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn} <tspan fill="var(--mut)" font-weight="500">${yy}</tspan></text>`;
+    s += u.kecil
+      ? `<text x="${cx}" y="${H - 28}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn}</text><text x="${cx}" y="${H - 13}" text-anchor="middle" font-size="${fa}" fill="var(--mut)">${yy}</text>`
+      : `<text x="${cx}" y="${H - 26}" text-anchor="middle" font-size="${fb}" font-weight="600" fill="var(--ink)">${bn} <tspan fill="var(--mut)" font-weight="500">${yy}</tspan></text>`;
     if (c.none) return;
     const tip = `${bl(c.m)}: Model ${fmt(c.mean, 0)} mm | Baseline ${fmt(c.Nm, 0)} mm | ${CN[c.cat]}`;
     s += `<rect x="${cx - bw / 2}" y="${Y(c.Nm)}" width="${bw}" height="${Math.max(1.5, c.Nm / top * ph)}" rx="3" fill="var(--mut)" opacity=".25" stroke="var(--mut)" data-tip="${tip}"/>` +
@@ -1198,38 +1207,79 @@ function render() {
 function pilihTahun(y) { if (daftarTahun().indexOf(y) > -1) { tahun = y; render(); } }
 function pilihKab(id) { if (!A[id] || !Object.keys(A[id].years).length) return; kab = id; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); }
 
+/* ---------- Sumber data hujan: pemuatan & pergantian ---------- */
+let muatTok = 0, ensPakai = null, oniPakai = null, bomPakai = null, tampil = false;
+
+function infoSumber() {   // ringkasan jenis data yang sedang dipakai model
+  let a = 0, s = 0, y0 = 9999, y1 = 0;
+  KAB.forEach(k => {
+    const ys = A[k.id] ? Object.keys(A[k.id].years).map(Number) : [];
+    if (!ys.length) return;
+    y0 = Math.min(y0, ...ys); y1 = Math.max(y1, ...ys);
+    let st = false, ada = false;
+    ys.forEach(y => A[k.id].years[y].forEach(r => { if (r && r.pos_rata != null && r.pos_rata > 0) { ada = true; if (r.pos_rata > 1.0001) st = true; } }));
+    if (ada) { if (st) s++; else a++; }
+  });
+  return a + s ? 'Areal ' + a + ' · Stasiun ' + s + ' kab · ' + y0 + '–' + y1 : '';
+}
+function komit(s) {
+  SRC = s; API_URL = s.url;
+  try { localStorage.setItem('ch_sumber_aktif', s.id); } catch (e) {}
+  const sel = $('sumber-sel'); if (sel) sel.value = s.id;
+}
+function tampilkan() {
+  if (!RAW || !Object.keys(RAW).length) return false;
+  proses(RAW);   // membangun ulang A dan mengosongkan cache model → logika prediksi menyesuaikan otomatis
+  const punya = id => A[id] && Object.keys(A[id].years).length;
+  if (!punya(kab)) { const k = KAB.find(k => punya(k.id)); if (k) kab = k.id; }
+  const ys = daftarTahun(); if (!ys.length) return false;
+  if (tahun == null || ys.indexOf(tahun) < 0) tahun = ys[0];
+  ensPakai = ENS; oniPakai = ONI; bomPakai = BOM; mapFit = false;
+  $('st').hidden = true; $('app').hidden = false; $('app').style.opacity = ''; tampil = true;
+  $('sumber-st').textContent = infoSumber();
+  render(); return true;
+}
+async function aktifkan(s, awal) {
+  const tok = ++muatTok, prev = SRC, kk = dk(s), cd = bacaLS(kk), st = $('sumber-st');
+  let dariCache = false;
+  if (cd && cd.data && cd.u === s.url) { RAW = cd.data; komit(s); setSumber(cd.sumber || s.nama); dariCache = tampilkan(); }
+  else if (!awal) { $('app').style.opacity = '.45'; st.textContent = 'Memuat ' + s.nama + '…'; }
+  try {
+    const j = JSON.parse(await ft(urlApi(s.url, 'aksi=ch_bulanan&kab=semua'), 30000));
+    if (j.error) throw new Error(j.error);
+    if (!j.data || !Object.keys(j.data).length) throw new Error('sumber tidak berisi data');
+    if (tok !== muatTok) return;   // pengguna sudah memilih sumber lain
+    RAW = j.data; komit(s); setSumber(j.sumber_hujan || s.nama);
+    tulisLS(kk, { at: Date.now(), u: s.url, data: RAW, sumber: SUMBER_HUJAN });
+    tampilkan();
+  } catch (e) {
+    if (tok !== muatTok || dariCache) return;
+    const msg = e.name === 'AbortError' ? 'timeout' : e.message;
+    if (awal) { $('st').hidden = false; $('st').innerHTML = 'Gagal memuat (' + msg + ') <button type="button" onclick="muat()">Coba lagi</button>'; return; }
+    komit(prev); $('app').style.opacity = '';   // gagal: tetap di sumber sebelumnya
+    st.textContent = 'Gagal memuat ' + s.nama + ' (' + msg + '); tetap memakai ' + prev.nama;
+  }
+}
+function initSumber() {
+  const sel = $('sumber-sel');
+  $('bsumber').hidden = SUMBER.length < 2;
+  sel.innerHTML = SUMBER.map(s => '<option value="' + s.id + '">' + s.nama + '</option>').join('');
+  sel.value = SRC.id;
+  sel.addEventListener('change', () => { const s = SUMBER.find(x => x.id === sel.value); if (s) aktifkan(s, false); });
+}
 async function muat() {
   $('st').hidden = false; $('st').textContent = 'Memuat data…';
-    const cd = bacaLS(DK), ce = bacaLS(CK), co = bacaLS(OK_), cb = bacaLS(BK);
+  const ce = bacaLS(CK), co = bacaLS(OK_), cb = bacaLS(BK);
   if (ce && ce.obs) ENS = Object.assign(ce, { mode: 'cache', at: new Date(ce.at), err: [] });
   if (co) terapkanOni(co);
   if (cb) terapkanBom(cb);
-  let tampil = false, ensPakai = null, oniPakai = null, bomPakai = null;
-  const tampilkan = () => {
-    if (!RAW || !Object.keys(RAW).length) return;
-    proses(RAW);
-    const ys = daftarTahun(); if (tahun == null || ys.indexOf(tahun) < 0) tahun = ys[0];
-    ensPakai = ENS; oniPakai = ONI; bomPakai = BOM;
-    
-    $('st').hidden = true; $('app').hidden = false; tampil = true; render();
-  };
-  // 1) Kunjungan berulang: tampil seketika dari cache lokal
-  if (cd && cd.data) { RAW = cd.data; setSumber(cd.sumber); tampilkan(); }
-  // 2) Semua permintaan jaringan berjalan paralel, tidak saling menunggu
   const pEns = ambilEnso().catch(() => {});
   const pBatas = muatBatas();
-  try {
-    const j = JSON.parse(await ft(API_URL + '?aksi=ch_bulanan&kab=semua', 30000));
-    if (j.error) throw new Error(j.error);
-    RAW = j.data; setSumber(j.sumber_hujan); tulisLS(DK, { at: Date.now(), data: RAW, sumber: SUMBER_HUJAN });
-    tampilkan();                       // tampil begitu data hujan tiba, tanpa menunggu ENSO
-  } catch (e) {
-    if (!tampil) { $('st').innerHTML = 'Gagal memuat (' + (e.name === 'AbortError' ? 'timeout' : e.message) + ') <button type="button" onclick="muat()">Coba lagi</button>'; return; }
-  }
+  await aktifkan(SRC, true);
   await pEns;
   if (tampil && (ENS !== ensPakai || ONI !== oniPakai || BOM !== bomPakai)) tampilkan();   // hitung ulang bila ENSO baru tiba
   await pBatas;
-  if (mode === 'semua' && leafletMap) updateMap();                    // pakai batas poligon bila terlambat tiba
+  if (mode === 'semua' && leafletMap) updateMap();   // pakai batas poligon bila terlambat tiba
 }
 
 $('md').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.dataset.m === mode) return; mode = b.dataset.m; const ys = daftarTahun(); if (ys.indexOf(tahun) < 0) tahun = ys[0]; render(); });
@@ -1245,9 +1295,10 @@ $('rf').onclick = async () => { $('rf').disabled = true; await ambilEnso(); pros
 $('thn').onchange = e => pilihTahun(+e.target.value);
 $('prev').onclick = () => pilihTahun(tahun - 1); $('next').onclick = () => pilihTahun(tahun + 1);
 let lw = 0, rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!tahun) return; const w = $(mode === 'semua' ? 'cmp' : mode === 'proy' ? 'pc' : 'chart').clientWidth; if (w && w !== lw) { lw = w; if (mode === 'semua') banding(); else if (mode === 'proy') grafikProy(); else { const rw = S().years[tahun] || Array(12).fill(null); gambar(rw); gambarEnso(); gambarHH(rw); } } }, 150); });
+initSumber();
 muat().catch(e => { $('st').textContent = 'Gagal memuat: ' + e.message; console.error(e); });
 </script>
-      <script src="perbaikan.js"></script>
-   <script src="prediktor.js"></script>
+<script src="perbaikan.js"></script>
+<script src="prediktor.js"></script>
 </body>
 </html>
