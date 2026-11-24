@@ -1,7 +1,7 @@
 {
   "sumber": "https://www.bom.gov.au/clim_data/IDCK000072/rnino_3.4.txt",
   "keterangan": "Anomali Niño-3.4 relatif (BoM), rata-rata bulanan dari data mingguan",
-  "minggu_terakhir": "2026-11-15",
+  "minggu_terakhir": "2026-11-22",
   "terakhir": "2026-11",
   "sementara": [
     "2026-11"
@@ -270,7 +270,7 @@
       2.33,
       2.56,
       2.8,
-      2.71,
+      2.7,
       null
     ]
   }
