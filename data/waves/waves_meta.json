@@ -1,8 +1,8 @@
 {
- "generated": "2026-11-26T12:01:07Z",
- "source": "https://psl.noaa.gov/thredds/dodsC/Datasets/cpc_blended_olr-1deg/olr.day.mean.nc",
- "olr_last_date": "2026-11-21",
- "written_last_date": "2026-11-14",
+ "generated": "2026-11-28T10:54:46Z",
+ "source": "https://psl.noaa.gov/thredds/dodsC/Datasets/olr_cdr_day/olr.day.mean.v2.nc",
+ "olr_last_date": "2026-11-15",
+ "written_last_date": "2026-11-08",
  "box": {
   "lon": [
    115.0,
